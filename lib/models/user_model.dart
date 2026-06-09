@@ -21,6 +21,17 @@ class UserModel {
   final int tokens;
   final int earnedCoins;
   final List<MediaItem> media;
+  // Social stats
+  final int followersCount;
+  final int followingCount;
+  final int totalLikes;
+  // Gift showcase
+  final List<GiftItem> gifts;
+  // Status posts
+  final List<StatusPost> statuses;
+  // Agency
+  final String? agencyName;
+  final bool isAgencyOwner;
 
   UserModel({
     required this.id,
@@ -43,6 +54,13 @@ class UserModel {
     this.tokens = 0,
     this.earnedCoins = 0,
     this.media = const [],
+    this.followersCount = 0,
+    this.followingCount = 0,
+    this.totalLikes = 0,
+    this.gifts = const [],
+    this.statuses = const [],
+    this.agencyName,
+    this.isAgencyOwner = false,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -69,6 +87,17 @@ class UserModel {
       media:              (json['media'] as List<dynamic>?)
           ?.map((m) => MediaItem.fromJson(m))
           .toList() ?? [],
+      followersCount:     json['followers_count'] as int? ?? 0,
+      followingCount:     json['following_count'] as int? ?? 0,
+      totalLikes:         json['total_likes'] as int? ?? 0,
+      gifts:              (json['gifts'] as List<dynamic>?)
+          ?.map((g) => GiftItem.fromJson(g))
+          .toList() ?? [],
+      statuses:           (json['statuses'] as List<dynamic>?)
+          ?.map((s) => StatusPost.fromJson(s))
+          .toList() ?? [],
+      agencyName:         json['agency_name'] as String?,
+      isAgencyOwner:      json['is_agency_owner'] as bool? ?? false,
     );
   }
 
@@ -106,6 +135,9 @@ class UserModel {
     int? tokens,
     int? earnedCoins,
     List<MediaItem>? media,
+    int? followersCount,
+    int? followingCount,
+    int? totalLikes,
   }) {
     return UserModel(
       id:                 id,
@@ -128,6 +160,13 @@ class UserModel {
       tokens:             tokens ?? this.tokens,
       earnedCoins:        earnedCoins ?? this.earnedCoins,
       media:              media ?? this.media,
+      followersCount:     followersCount ?? this.followersCount,
+      followingCount:     followingCount ?? this.followingCount,
+      totalLikes:         totalLikes ?? this.totalLikes,
+      gifts:              gifts,
+      statuses:           statuses,
+      agencyName:         agencyName,
+      isAgencyOwner:      isAgencyOwner,
     );
   }
 }
@@ -148,4 +187,46 @@ class MediaItem {
   }
 
   Map<String, dynamic> toJson() => {'id': id, 'url': url, 'type': type};
+}
+
+class GiftItem {
+  final String emoji;
+  final int count;
+  final String name;
+
+  GiftItem({required this.emoji, required this.count, required this.name});
+
+  factory GiftItem.fromJson(Map<String, dynamic> json) {
+    return GiftItem(
+      emoji: json['emoji'] as String? ?? '🎁',
+      count: json['count'] as int? ?? 1,
+      name:  json['name'] as String? ?? '',
+    );
+  }
+}
+
+class StatusPost {
+  final int id;
+  final String content;
+  final DateTime createdAt;
+  final int likesCount;
+  final bool isLiked;
+
+  StatusPost({
+    required this.id,
+    required this.content,
+    required this.createdAt,
+    this.likesCount = 0,
+    this.isLiked = false,
+  });
+
+  factory StatusPost.fromJson(Map<String, dynamic> json) {
+    return StatusPost(
+      id:         json['id'] as int,
+      content:    json['content'] as String? ?? '',
+      createdAt:  DateTime.parse(json['created_at'] as String),
+      likesCount: json['likes_count'] as int? ?? 0,
+      isLiked:    json['is_liked'] as bool? ?? false,
+    );
+  }
 }

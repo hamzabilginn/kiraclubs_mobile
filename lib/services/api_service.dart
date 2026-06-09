@@ -197,7 +197,33 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getVisitors() async {
     final res = await _dio.get('/profile/visitors');
-    return (res.data['visitors'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final list = (res.data['visitors'] as List<dynamic>? ?? []);
+    return list.map((v) {
+      final raw = v as Map<String, dynamic>;
+      final viewerRaw = raw['viewer'] as Map<String, dynamic>?;
+      return {
+        'viewer': viewerRaw != null ? UserModel.fromJson(viewerRaw) : null,
+        'is_locked': raw['is_locked'] as bool? ?? false,
+        'updated_at': raw['updated_at'] as String?,
+      };
+    }).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getLikers() async {
+    final res = await _dio.get('/profile/likers');
+    final list = (res.data['likers'] as List<dynamic>? ?? []);
+    return list.map((l) {
+      final raw = l as Map<String, dynamic>;
+      final senderRaw = raw['sender'] as Map<String, dynamic>?;
+      return {
+        'sender': senderRaw != null ? UserModel.fromJson(senderRaw) : null,
+        'is_locked': raw['is_locked'] as bool? ?? false,
+        'target_label': raw['target_label'] as String? ?? 'Beğendi',
+        'created_at': raw['created_at'] as String?,
+        'id': raw['id'],
+        'type': raw['type'] as String? ?? 'photo',
+      };
+    }).toList();
   }
 
   // ─── Wallet ───────────────────────────────────────────────────────────────

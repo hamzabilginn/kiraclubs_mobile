@@ -1,0 +1,40 @@
+class AppConstants {
+  // ─── API ──────────────────────────────────────────────────────────────────
+  static const String baseUrl = 'https://www.kiraclubs.com/api/v1';
+
+  // ─── Token Storage Key ────────────────────────────────────────────────────
+  static const String tokenKey = 'auth_token';
+  static const String userKey  = 'auth_user';
+
+  // ─── Agora ────────────────────────────────────────────────────────────────
+  static const String agoraAppId = 'YOUR_AGORA_APP_ID';
+
+  // ─── Google Play Product IDs ──────────────────────────────────────────────
+  static const List<String> tokenProducts = [
+    'tokens_100',
+    'tokens_300',
+    'tokens_600',
+    'tokens_1500',
+    'tokens_3000',
+  ];
+
+  static const Map<String, int> tokenAmounts = {
+    'tokens_100':  100,
+    'tokens_300':  300,
+    'tokens_600':  600,
+    'tokens_1500': 1500,
+    'tokens_3000': 3000,
+  };
+
+  static const List<String> vipProducts = [
+    'vip_silver_month',
+    'vip_gold_month',
+    'vip_platin_month',
+  ];
+
+  static const Map<String, String> vipLabels = {
+    'silver':   'Silver VIP',
+    'gold':     'Gold VIP',
+    'platinum': 'Platinum VIP',
+  };
+}

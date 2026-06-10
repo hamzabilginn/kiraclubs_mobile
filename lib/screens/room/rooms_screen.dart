@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import 'voice_room_screen.dart';
 
 class RoomsScreen extends StatefulWidget {
   const RoomsScreen({Key? key}) : super(key: key);
@@ -262,11 +263,12 @@ class _RoomsScreenState extends State<RoomsScreen> {
                               const SizedBox(height: 12),
                               ElevatedButton(
                                 onPressed: () {
-                                  // Join Room functionality — placeholder or route to WebView / Agora screen
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                    content: Text('Sesli odaya bağlanılıyor... 🎙️'),
-                                    duration: Duration(seconds: 2),
-                                  ));
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => VoiceRoomScreen(room: room),
+                                    ),
+                                  );
                                 },
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

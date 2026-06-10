@@ -40,6 +40,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadUser() async {
+    try {
+      _user = await _api.getMe();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<bool> login(String email, String password) async {
     _setLoading(true);
     _errorMessage = null;

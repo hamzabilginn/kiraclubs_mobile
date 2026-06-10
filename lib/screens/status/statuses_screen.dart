@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import 'status_detail_screen.dart';
 
 class StatusesScreen extends StatefulWidget {
   const StatusesScreen({Key? key}) : super(key: key);
@@ -316,15 +317,24 @@ class _StatusesScreenState extends State<StatusesScreen> {
     final bool isLiked = status['is_liked'] ?? false;
     final int likesCount = status['likes_count'] ?? 0;
     
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.borderCol),
-      ),
-      child: Column(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StatusDetailScreen(status: status),
+          ),
+        ).then((_) => _fetchStatuses(refresh: true));
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppTheme.borderCol),
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -408,6 +418,7 @@ class _StatusesScreenState extends State<StatusesScreen> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

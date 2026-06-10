@@ -25,8 +25,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   Future<void> _load() async {
     try {
-      final user = await _api.getUserById(widget.userId);
-      setState(() { _user = user; _isLoading = false; });
+      final res = await _api.getUserById(widget.userId);
+      setState(() {
+        _user = res['user'] as UserModel;
+        _isFollowing = res['is_following'] as bool? ?? false;
+        _isLoading = false;
+      });
     } catch (e) { setState(() => _isLoading = false); }
   }
 

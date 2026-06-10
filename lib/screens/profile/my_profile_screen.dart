@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
+import 'agency_screen.dart';
+import 'support_tickets_screen.dart';
+import 'visitors_screen.dart';
+import 'likers_screen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   const MyProfileScreen({Key? key}) : super(key: key);
@@ -95,6 +100,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 
             // 6. Mavi Tik (Profil Doğrulama)
             _buildVerificationCard(user),
+            const SizedBox(height: 16),
+
+            // Profil Ziyaretçileri ve Beğenenler
+            _buildActivityRows(),
             const SizedBox(height: 16),
 
             // 7. Ajans Yönetim Paneli
@@ -459,8 +468,70 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     );
   }
 
+  Future<void> _selectAndUploadVerificationPhoto() async {
+    final picker = ImagePicker();
+    final img = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    if (img == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Doğrulama fotoğrafı yükleniyor... ⏳'),
+      behavior: SnackBarBehavior.floating,
+    ));
+
+    try {
+      final res = await _api.uploadVerificationPhoto(img.path);
+      if (res['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(res['message'] ?? 'Fotoğraf başarıyla yüklendi!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ));
+          // Reload user info
+          Provider.of<AuthProvider>(context, listen: false).loadUser();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Yükleme başarısız oldu: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
   Widget _buildVerificationCard(UserModel user) {
-    final bool isVerified = user.verificationStatus == 'approved';
+    final String status = user.verificationStatus ?? '';
+    final bool isVerified = status == 'approved';
+    final bool isPending = status == 'pending';
+
+    Color cardBgColor = AppTheme.cardColor;
+    Color borderColor = AppTheme.borderCol;
+    Color iconBgColor = const Color(0xFF1F2937);
+    IconData icon = Icons.check_rounded;
+    String title = 'Doğrulanmamış Profil';
+    String description = 'Profilinizi doğrulayarak Mavi Tik sahibi olun.';
+    Color titleColor = Colors.white;
+
+    if (isVerified) {
+      cardBgColor = const Color(0xFF0F1E36);
+      borderColor = const Color(0xFF1D4ED8);
+      iconBgColor = const Color(0xFF3B82F6);
+      title = 'Profiliniz Doğrulandı';
+      description = 'Tebrikler! Mavi Tik rozetiniz profilinizde aktif olarak gösterilmektedir.';
+      titleColor = const Color(0xFF60A5FA);
+    } else if (isPending) {
+      cardBgColor = const Color(0xFF1E1E2C);
+      borderColor = Colors.amber.withOpacity(0.5);
+      iconBgColor = Colors.amber;
+      icon = Icons.hourglass_empty_rounded;
+      title = 'Doğrulama Bekleniyor';
+      description = 'Doğrulama fotoğrafınız yüklendi ve incelenmektedir.';
+      titleColor = Colors.amberAccent;
+      titleColor = Colors.amber;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,52 +552,70 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isVerified ? const Color(0xFF0F1E36) : AppTheme.cardColor,
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: isVerified ? const Color(0xFF1D4ED8) : AppTheme.borderCol),
+            border: Border.all(color: borderColor),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isVerified ? const Color(0xFF3B82F6) : const Color(0xFF1F2937),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isVerified ? 'Profiliniz Doğrulandı' : 'Doğrulanmamış Profil',
-                      style: TextStyle(
-                        color: isVerified ? const Color(0xFF60A5FA) : Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: iconBgColor,
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isVerified 
-                          ? 'Tebrikler! Mavi Tik rozetiniz profilinizde aktif olarak gösterilmektedir.'
-                          : 'Profilinizi doğrulayarak Mavi Tik sahibi olun.',
-                      style: TextStyle(
-                        color: isVerified ? const Color(0xFF93C5FD) : AppTheme.textSecondary,
-                        fontSize: 11,
-                        height: 1.4,
-                      ),
+                    child: Icon(
+                      icon,
+                      color: isPending ? Colors.black : Colors.white,
+                      size: 20,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            color: titleColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          description,
+                          style: TextStyle(
+                            color: isVerified ? const Color(0xFF93C5FD) : AppTheme.textSecondary,
+                            fontSize: 11,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              if (!isVerified && !isPending) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _selectAndUploadVerificationPhoto,
+                    icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                    label: const Text('Doğrulama Fotoğrafı Gönder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1D4ED8),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -549,7 +638,12 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AgencyScreen()),
+          );
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -572,7 +666,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 
   Widget _buildSupportCard() {
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SupportTicketsScreen()),
+        );
+      },
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
@@ -603,7 +704,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
         ],
       ),
-    );
+    ),);
   }
 
   Widget _buildLogoutButton(AuthProvider auth) {
@@ -634,6 +735,57 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildActivityRows() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'ETKİLEŞİM',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.borderCol),
+          ),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.remove_red_eye_outlined, color: AppTheme.primaryColor),
+                title: const Text('Profilimi Gezenler', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Profilinizi kimlerin ziyaret ettiğini görün.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 10)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const VisitorsScreen()),
+                  );
+                },
+              ),
+              const Divider(color: Colors.white10, height: 1),
+              ListTile(
+                leading: const Icon(Icons.favorite_outline_rounded, color: Colors.pinkAccent),
+                title: const Text('Beni Beğenenler', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Fotoğraflarınızı ve durumlarınızı beğenenleri görün.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 10)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LikersScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

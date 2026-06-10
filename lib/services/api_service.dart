@@ -103,9 +103,20 @@ class ApiService {
     };
   }
 
-  Future<UserModel> getUserById(int userId) async {
+  Future<Map<String, dynamic>> getUserById(int userId) async {
     final res = await _dio.get('/user/$userId/profile');
-    return UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+    return {
+      'user': UserModel.fromJson(res.data['user'] as Map<String, dynamic>),
+      'is_following': res.data['is_following'] as bool? ?? false,
+    };
+  }
+
+  Future<Map<String, dynamic>> uploadVerificationPhoto(String filePath) async {
+    final formData = FormData.fromMap({
+      'verification_photo': await MultipartFile.fromFile(filePath, filename: 'verification.jpg'),
+    });
+    final res = await _dio.post('/profile/verify-upload', data: formData);
+    return res.data as Map<String, dynamic>;
   }
 
   // ─── Chat ─────────────────────────────────────────────────────────────────
@@ -288,6 +299,219 @@ class ApiService {
       data['cover_image'] = await MultipartFile.fromFile(coverPath);
     }
     final res = await _dio.post('/rooms', data: FormData.fromMap(data));
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Support Tickets ──────────────────────────────────────────────────────
+
+  Future<List<dynamic>> getSupportTickets() async {
+    final res = await _dio.get('/support');
+    return res.data['tickets'] as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createSupportTicket({
+    required String title,
+    required String message,
+  }) async {
+    final res = await _dio.post('/support', data: {
+      'title': title,
+      'message': message,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getSupportTicketDetails(int ticketId) async {
+    final res = await _dio.get('/support/$ticketId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> replySupportTicket({
+    required int ticketId,
+    required String message,
+  }) async {
+    final res = await _dio.post('/support/$ticketId/reply', data: {
+      'message': message,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> closeSupportTicket(int ticketId) async {
+    final res = await _dio.post('/support/$ticketId/close');
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Payout Withdrawals ───────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> requestWithdrawal({
+    required double amount,
+    required String paymentMethod,
+    String? iban,
+    String? accountName,
+    String? bankName,
+    String? cryptoAddress,
+  }) async {
+    final res = await _dio.post('/wallet/withdraw', data: {
+      'amount': amount,
+      'payment_method': paymentMethod,
+      if (iban != null) 'iban': iban,
+      if (accountName != null) 'account_name': accountName,
+      if (bankName != null) 'bank_name': bankName,
+      if (cryptoAddress != null) 'crypto_address': cryptoAddress,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Profile Unlocks ──────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> unlockProfileVisitor(int viewerId) async {
+    final res = await _dio.post('/profile/visitors/$viewerId/unlock');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> unlockProfileLiker(String type, int likeId) async {
+    final res = await _dio.post('/profile/likers/$type/$likeId/unlock');
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Status Views & Comments ──────────────────────────────────────────────
+
+  Future<void> viewStatus(int statusId) async {
+    await _dio.post('/status/$statusId/view');
+  }
+
+  Future<List<dynamic>> getStatusViewers(int statusId) async {
+    final res = await _dio.get('/status/$statusId/viewers');
+    return res.data['viewers'] as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getStatusComments(int statusId) async {
+    final res = await _dio.get('/status/$statusId/comments');
+    return res.data['comments'] as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> postStatusComment(int statusId, String comment) async {
+    final res = await _dio.post('/status/$statusId/comments', data: {
+      'comment': comment,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Agency Management ────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getAgencyIndex() async {
+    final res = await _dio.get('/agency');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> joinAgency(String inviteCode) async {
+    final res = await _dio.post('/agency/join', data: {
+      'invite_code': inviteCode,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> leaveAgency() async {
+    final res = await _dio.post('/agency/leave');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> removeAgencyPublisher(int publisherId) async {
+    final res = await _dio.post('/agency/remove-publisher/$publisherId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> toggleAgencyPublisherFreeze(int publisherId) async {
+    final res = await _dio.post('/agency/publisher/$publisherId/toggle-freeze');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateAgencyPublisherCommission(int publisherId, double commissionRate) async {
+    final res = await _dio.post('/agency/publisher/$publisherId/update-commission', data: {
+      'commission_rate': commissionRate,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Mass Messaging ───────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> sendMassMessage(String message) async {
+    final res = await _dio.post('/discover/mass-message', data: {
+      'message': message,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Manual Wallet Deposits ────────────────────────────────────────────────
+  
+  Future<Map<String, dynamic>> createDepositRequest({
+    required double usdtAmount,
+    required String paymentMethod,
+    String? txid,
+    String? senderName,
+  }) async {
+    final res = await _dio.post('/wallet/deposit', data: {
+      'usdt_amount': usdtAmount,
+      'payment_method': paymentMethod,
+      if (txid != null) 'txid': txid,
+      if (senderName != null) 'sender_name': senderName,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Voice Room Details & Actions ──────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getRoomDetails(int roomId) async {
+    final res = await _dio.get('/rooms/$roomId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> leaveRoom(int roomId) async {
+    final res = await _dio.post('/rooms/$roomId/leave');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> inviteToSpeak(int roomId, int userId) async {
+    final res = await _dio.post('/rooms/$roomId/invite/$userId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> acceptSpeakInvite(int roomId) async {
+    final res = await _dio.post('/rooms/$roomId/accept');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> demoteSpeaker(int roomId, int userId) async {
+    final res = await _dio.post('/rooms/$roomId/demote/$userId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> kickUser(int roomId, int userId) async {
+    final res = await _dio.post('/rooms/$roomId/kick/$userId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> roomHeartbeat(int roomId) async {
+    final res = await _dio.post('/rooms/$roomId/heartbeat');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> raiseHand(int roomId) async {
+    final res = await _dio.post('/rooms/$roomId/raise-hand');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> lowerHand(int roomId, int userId) async {
+    final res = await _dio.post('/rooms/$roomId/lower-hand/$userId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> toggleRoomLock(int roomId) async {
+    final res = await _dio.post('/rooms/$roomId/toggle-lock');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> sendRoomEmoji(int roomId, String emoji) async {
+    final res = await _dio.post('/rooms/$roomId/emoji', data: {'emoji': emoji});
     return res.data as Map<String, dynamic>;
   }
 }

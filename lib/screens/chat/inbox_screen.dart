@@ -7,6 +7,8 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import 'chat_screen.dart';
 import '../profile/public_profile_screen.dart';
+import '../profile/likers_screen.dart';
+import '../profile/visitors_screen.dart';
 
 
 class InboxScreen extends StatefulWidget {
@@ -440,15 +442,21 @@ class _InboxScreenState extends State<InboxScreen>
     ]));
 
   void _unlockLiker(Map<String, dynamic> like) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('🔒 Bu özellik yakında aktif olacak!'),
-      backgroundColor: Color(0xFF1A1830), behavior: SnackBarBehavior.floating));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LikersScreen()),
+    ).then((_) {
+      _loadLikers();
+    });
   }
 
   void _unlockVisitor(Map<String, dynamic> visit) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('🔒 Bu özellik yakında aktif olacak!'),
-      backgroundColor: Color(0xFF1A1830), behavior: SnackBarBehavior.floating));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const VisitorsScreen()),
+    ).then((_) {
+      _loadVisitors();
+    });
   }
 
   String _timeAgo(DateTime dt) {

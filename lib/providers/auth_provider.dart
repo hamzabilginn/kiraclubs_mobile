@@ -58,7 +58,9 @@ class AuthProvider extends ChangeNotifier {
       await _saveSession(data);
       _setLoading(false);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      print("LOGIN ERROR: $e");
+      print(stack);
       _errorMessage = _extractError(e);
       _setLoading(false);
       return false;
@@ -83,7 +85,9 @@ class AuthProvider extends ChangeNotifier {
       await _saveSession(data);
       _setLoading(false);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      print("REGISTER ERROR: $e");
+      print(stack);
       _errorMessage = _extractError(e);
       _setLoading(false);
       return false;
@@ -139,6 +143,7 @@ class AuthProvider extends ChangeNotifier {
         return errors.values.first.first.toString();
       }
     } catch (_) {}
+    // Geçici debug: gerçek hata mesajını göster
     return 'Bir hata oluştu. Lütfen tekrar deneyin.';
   }
 }

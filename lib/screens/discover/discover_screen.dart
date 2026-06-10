@@ -7,6 +7,7 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../profile/public_profile_screen.dart';
 import '../chat/chat_screen.dart';
+import 'leaderboard_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({Key? key}) : super(key: key);
@@ -230,6 +231,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               ),
             ),
             const Spacer(),
+            // Leaderboard Button
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.borderCol),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.emoji_events_rounded, color: Colors.amber),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+                  );
+                },
+                tooltip: 'Sıralama',
+              ),
+            ),
+            const SizedBox(width: 8),
             // Refresh Button
             Container(
               decoration: BoxDecoration(

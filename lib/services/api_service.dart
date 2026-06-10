@@ -239,4 +239,55 @@ class ApiService {
     final res = await _dio.get('/call/$userId');
     return res.data as Map<String, dynamic>;
   }
+
+  // ─── Statuses ─────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getStatuses({int page = 1}) async {
+    final res = await _dio.get('/statuses', queryParameters: {'page': page});
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createStatus({required String content, String? mediaPath}) async {
+    final Map<String, dynamic> data = {'content': content};
+    if (mediaPath != null) {
+      data['media'] = await MultipartFile.fromFile(mediaPath);
+    }
+    final res = await _dio.post('/status', data: FormData.fromMap(data));
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> likeStatus(int statusId) async {
+    final res = await _dio.post('/status/$statusId/like');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> deleteStatus(int statusId) async {
+    final res = await _dio.delete('/status/$statusId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ─── Rooms ────────────────────────────────────────────────────────────────
+
+  Future<List<dynamic>> getRooms() async {
+    final res = await _dio.get('/rooms');
+    return res.data['rooms'] as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createRoom({
+    required String name,
+    String? description,
+    String? category,
+    String? coverPath,
+  }) async {
+    final Map<String, dynamic> data = {
+      'name': name,
+      if (description != null) 'description': description,
+      if (category != null) 'category': category,
+    };
+    if (coverPath != null) {
+      data['cover_image'] = await MultipartFile.fromFile(coverPath);
+    }
+    final res = await _dio.post('/rooms', data: FormData.fromMap(data));
+    return res.data as Map<String, dynamic>;
+  }
 }

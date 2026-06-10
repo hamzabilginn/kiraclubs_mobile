@@ -8,6 +8,7 @@ class UserModel {
   final String? country;
   final String? bio;
   final String? avatarUrl;
+  final String? referralCode;
   final String? vipLevel;
   final bool isVip;
   final String? verificationStatus;
@@ -41,6 +42,7 @@ class UserModel {
     this.country,
     this.bio,
     this.avatarUrl,
+    this.referralCode,
     this.vipLevel,
     this.isVip = false,
     this.verificationStatus,
@@ -72,6 +74,7 @@ class UserModel {
       country:            json['country'] as String?,
       bio:                json['bio'] as String?,
       avatarUrl:          json['avatar_url'] as String?,
+      referralCode:       json['referral_code'] as String?,
       vipLevel:           json['vip_level'] as String?,
       isVip:              json['is_vip'] as bool? ?? false,
       verificationStatus: json['verification_status'] as String?,
@@ -109,6 +112,7 @@ class UserModel {
     'country':             country,
     'bio':                 bio,
     'avatar_url':          avatarUrl,
+    'referral_code':       referralCode,
     'vip_level':           vipLevel,
     'is_vip':              isVip,
     'verification_status': verificationStatus,
@@ -130,6 +134,7 @@ class UserModel {
     String? bio,
     String? country,
     String? avatarUrl,
+    String? referralCode,
     String? vipLevel,
     bool? isVip,
     int? tokens,
@@ -147,6 +152,7 @@ class UserModel {
       country:            country ?? this.country,
       bio:                bio ?? this.bio,
       avatarUrl:          avatarUrl ?? this.avatarUrl,
+      referralCode:       referralCode ?? this.referralCode,
       vipLevel:           vipLevel ?? this.vipLevel,
       isVip:              isVip ?? this.isVip,
       verificationStatus: verificationStatus,

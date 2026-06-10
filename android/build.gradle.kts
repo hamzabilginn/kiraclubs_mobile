@@ -28,6 +28,11 @@ subprojects {
     plugins.withId("com.android.library") {
         extensions.configure<com.android.build.gradle.LibraryExtension> {
             compileSdk = 36
+            defaultConfig {
+                ndk {
+                    abiFilters.addAll(setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+                }
+            }
         }
     }
 }

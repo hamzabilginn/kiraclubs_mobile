@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/constants.dart';
 import '../models/user_model.dart';
@@ -17,6 +19,14 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     ));
+
+    if (_dio.httpClientAdapter is IOHttpClientAdapter) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+        return client;
+      };
+    }
 
     // Token interceptor
     _dio.interceptors.add(InterceptorsWrapper(

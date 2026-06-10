@@ -2,12 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
 import '../profile/public_profile_screen.dart';
+import '../profile/my_profile_screen.dart';
 import '../chat/chat_screen.dart';
+import '../wallet/wallet_screen.dart';
 import 'leaderboard_screen.dart';
+import '../../widgets/autoplay_video_widget.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({Key? key}) : super(key: key);
@@ -123,12 +128,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
-  String _getFlagEmoji(String countryCode) {
-    if (countryCode.length != 2) return '📍';
-    final int firstLetter = countryCode.toUpperCase().codeUnitAt(0) - 0x41 + 0x1F1E6;
-    final int secondLetter = countryCode.toUpperCase().codeUnitAt(1) - 0x41 + 0x1F1E6;
-    return String.fromCharCode(firstLetter) + String.fromCharCode(secondLetter);
-  }
+
 
   void _resetAllFilters() {
     setState(() {
@@ -182,7 +182,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             childAspectRatio: 0.61, // Aspect ratio to comfortably fit 3/4 photo + action buttons
                           ),
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) => _userCard(_users[index]),
+                            (context, index) => DiscoverUserCard(user: _users[index]),
                             childCount: _users.length,
                           ),
                         ),
@@ -213,59 +213,141 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  Widget _header() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Row(
-          children: [
-            ShaderMask(
-              shaderCallback: (b) => AppTheme.primaryGradient.createShader(b),
-              child: const Text(
-                'KiraClubs',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                  fontStyle: FontStyle.italic,
-                ),
+  Widget _header() {
+    final auth = Provider.of<AuthProvider>(context);
+    final user = auth.user;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          ShaderMask(
+            shaderCallback: (b) => AppTheme.primaryGradient.createShader(b),
+            child: const Text(
+              'KiraClubs',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: -0.5,
+                fontStyle: FontStyle.italic,
               ),
             ),
-            const Spacer(),
-            // Leaderboard Button
-            Container(
+          ),
+          const Spacer(),
+          // 🏆 VIP Button
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppTheme.cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderCol),
+                color: const Color(0xFFF59E0B).withOpacity(0.15),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: IconButton(
-                icon: const Icon(Icons.emoji_events_rounded, color: Colors.amber),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
-                  );
-                },
-                tooltip: 'Sıralama',
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🏆', style: TextStyle(fontSize: 12)),
+                  SizedBox(width: 4),
+                  Text(
+                    'VIP',
+                    style: TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            // Refresh Button
-            Container(
+          ),
+          const SizedBox(width: 8),
+          // 💰 Credit Button
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletScreen()),
+              ).then((_) {
+                auth.loadUser();
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppTheme.cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderCol),
+                color: Colors.white.withOpacity(0.05),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                onPressed: _refreshUsers,
-                tooltip: 'Yenile',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('💰', style: TextStyle(fontSize: 12)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${user?.tokens ?? 0}',
+                    style: const TextStyle(
+                      color: Color(0xFFA78BFA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(width: 8),
+          // Avatar
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyProfileScreen()),
+              );
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.4), width: 1.5),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: user != null && user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: user.avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 16),
+                      )
+                    : Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : '👤',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _searchBar() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -384,7 +466,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               },
               activeColor: const Color(0xFF4F46E5),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -432,7 +514,131 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  Widget _userCard(UserModel user) {
+
+
+  Widget _shimmerGrid() {
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.61,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => Shimmer.fromColors(
+          baseColor: AppTheme.cardColor,
+          highlightColor: const Color(0xFF2A2740),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.cardColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+        childCount: 6,
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.explore_off_rounded, size: 64, color: AppTheme.textSecondary),
+          const SizedBox(height: 16),
+          Text(
+            'Sonuç bulunamadı!',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Farklı bir arama veya filtre deneyin.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+          ),
+          const SizedBox(height: 24),
+          TextButton(
+            onPressed: _resetAllFilters,
+            child: const Text('Filtreleri Temizle'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DiscoverUserCard extends StatefulWidget {
+  final UserModel user;
+  const DiscoverUserCard({Key? key, required this.user}) : super(key: key);
+
+  @override
+  State<DiscoverUserCard> createState() => _DiscoverUserCardState();
+}
+
+class _DiscoverUserCardState extends State<DiscoverUserCard> {
+  int _currentPage = 0;
+
+  String _formatLastSeen(String? lastSeenIso, bool isOnline) {
+    if (isOnline) return 'Çevrimiçi';
+    if (lastSeenIso == null) return 'Çevrimdışı';
+    try {
+      final dt = DateTime.parse(lastSeenIso).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      
+      if (diff.inMinutes < 5) return 'Çevrimiçi';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+      if (diff.inHours < 24) return '${diff.inHours} sa önce';
+      
+      final yesterday = DateTime(now.year, now.month, now.day - 1);
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        return 'Bugün ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } else if (dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day) {
+        return 'Dün ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return 'Çevrimdışı';
+    }
+  }
+
+  String _getFlagEmoji(String countryCode) {
+    if (countryCode.length != 2) return '📍';
+    final int firstLetter = countryCode.toUpperCase().codeUnitAt(0) - 0x41 + 0x1F1E6;
+    final int secondLetter = countryCode.toUpperCase().codeUnitAt(1) - 0x41 + 0x1F1E6;
+    return String.fromCharCode(firstLetter) + String.fromCharCode(secondLetter);
+  }
+
+  Widget _avatarPlaceholder(String name) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF4C1D95), Color(0xFF831843)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '👤',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 40,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+    final bool isFemale = Provider.of<AuthProvider>(context, listen: false).user?.gender == 'female';
     final bool isOnline = user.isOnline;
     final bool isVip = user.isVip;
     final String? vipLevel = user.vipLevel;
@@ -485,6 +691,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     child: user.media.isNotEmpty
                         ? PageView.builder(
                             itemCount: user.media.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentPage = index;
+                              });
+                            },
                             itemBuilder: (context, index) {
                               final media = user.media[index];
                               if (media.type == 'photo' || media.type == 'image') {
@@ -504,31 +715,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                   errorWidget: (context, url, error) => _avatarPlaceholder(user.name),
                                 );
                               } else {
-                                // Video
-                                return Stack(
-                                  children: [
-                                    Positioned.fill(
-                                      child: user.avatarUrl != null
-                                          ? CachedNetworkImage(
-                                              imageUrl: user.avatarUrl!,
-                                              fit: BoxFit.cover,
-                                              errorWidget: (context, url, error) => _avatarPlaceholder(user.name),
-                                            )
-                                          : _avatarPlaceholder(user.name),
-                                    ),
-                                    // Play overlay
-                                    Container(
-                                      color: Colors.black26,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.play_circle_outline_rounded,
-                                          color: Colors.white,
-                                          size: 44,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
+                                // Video - autoplay looped muted using AutoplayVideoWidget
+                                return AutoplayVideoWidget(videoUrl: media.url, placeholderUrl: user.firstPhotoUrl);
                               }
                             },
                           )
@@ -541,7 +729,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             : _avatarPlaceholder(user.name)),
                   ),
 
-                  // Swiper indicator dots
+                  // Swiper indicator dots - updated to track active page
                   if (user.media.length > 1)
                     Positioned(
                       bottom: 8,
@@ -551,13 +739,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
                           user.media.length,
-                          (index) => Container(
+                          (index) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
                             margin: const EdgeInsets.symmetric(horizontal: 2),
-                            width: 5,
+                            width: _currentPage == index ? 8 : 5,
                             height: 5,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.white54,
+                              color: _currentPage == index ? Colors.white : Colors.white54,
                             ),
                           ),
                         ),
@@ -714,6 +903,31 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             fontSize: 10,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isOnline ? const Color(0xFF10B981) : Colors.white54,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _formatLastSeen(user.lastSeenAt, isOnline),
+                                style: TextStyle(
+                                  color: isOnline ? const Color(0xFF10B981) : Colors.white60,
+                                  fontSize: 9,
+                                  fontWeight: isOnline ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -738,18 +952,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.chat_bubble_outline_rounded,
                       color: Colors.white,
                       size: 13,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
-                      'Mesaj Gönder',
-                      style: TextStyle(
+                      isFemale ? 'Mesaj Al' : 'Mesaj Gönder',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -807,82 +1021,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
       ),
       child: cardContent,
-    );
-  }
-
-  Widget _avatarPlaceholder(String name) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF4C1D95), Color(0xFF831843)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '👤',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 40,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _shimmerGrid() {
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.61,
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) => Shimmer.fromColors(
-          baseColor: AppTheme.cardColor,
-          highlightColor: const Color(0xFF2A2740),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppTheme.cardColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        childCount: 6,
-      ),
-    );
-  }
-
-  Widget _emptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.explore_off_rounded, size: 64, color: AppTheme.textSecondary),
-          const SizedBox(height: 16),
-          Text(
-            'Sonuç bulunamadı!',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Farklı bir arama veya filtre deneyin.',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-          ),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: _resetAllFilters,
-            child: const Text('Filtreleri Temizle'),
-          ),
-        ],
-      ),
     );
   }
 }

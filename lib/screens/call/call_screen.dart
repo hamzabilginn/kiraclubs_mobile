@@ -222,7 +222,7 @@ class _CallScreenState extends State<CallScreen> {
                 fit: BoxFit.cover,
               )
             else
-              Container(color: Colors.black85),
+              Container(color: Colors.black87),
             Container(color: Colors.black.withOpacity(0.65)),
             
             // Central UI content

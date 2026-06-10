@@ -66,6 +66,14 @@ class ApiService {
     return UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
   }
 
+  Future<Map<String, dynamic>> getMeWithTasks() async {
+    final res = await _dio.get('/profile');
+    return {
+      'user': UserModel.fromJson(res.data['user'] as Map<String, dynamic>),
+      'daily_tasks': res.data['daily_tasks'] as Map<String, dynamic>? ?? {},
+    };
+  }
+
   // ─── Discover ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getDiscover({
@@ -121,26 +129,64 @@ class ApiService {
 
   // ─── Chat ─────────────────────────────────────────────────────────────────
 
-  Future<List<ConversationModel>> getInbox() async {
-    final res = await _dio.get('/chat/inbox');
-    final list = res.data['conversations'] as List<dynamic>;
-    return list
-        .map((c) => ConversationModel.fromJson(c as Map<String, dynamic>))
-        .toList();
+  Future<Map<String, dynamic>> getInbox() async {
+    try {
+      final res = await _dio.get('/chat/inbox');
+      final conversationsList = res.data['conversations'] as List<dynamic>? ?? [];
+      final conversations = conversationsList
+          .map((c) => ConversationModel.fromJson(c as Map<String, dynamic>))
+          .toList();
+
+      final callsList = res.data['calls'] as List<dynamic>? ?? [];
+      final calls = callsList
+          .map((c) => CallLogItem.fromJson(c as Map<String, dynamic>))
+          .toList();
+
+      return {
+        'conversations': conversations,
+        'calls': calls,
+      };
+    } catch (e, stack) {
+      print("Error in getInbox API: $e");
+      print(stack);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getMessages(int userId) async {
-    final res = await _dio.get('/chat/$userId');
-    final messages = (res.data['messages'] as List<dynamic>)
-        .map((m) => MessageModel.fromJson(m as Map<String, dynamic>))
-        .toList();
-    final partner = UserModel.fromJson(res.data['partner'] as Map<String, dynamic>);
-    return {'messages': messages, 'partner': partner};
+    try {
+      final res = await _dio.get('/chat/$userId');
+      final messages = (res.data['messages'] as List<dynamic>)
+          .map((m) => MessageModel.fromJson(m as Map<String, dynamic>))
+          .toList();
+      final partner = UserModel.fromJson(res.data['partner'] as Map<String, dynamic>);
+      return {'messages': messages, 'partner': partner};
+    } catch (e, stack) {
+      print("Error in getMessages API for user $userId: $e");
+      print(stack);
+      rethrow;
+    }
   }
 
   Future<MessageModel> sendMessage(int userId, String body) async {
-    final res = await _dio.post('/chat/$userId', data: {'body': body});
-    return MessageModel.fromJson(res.data['message'] as Map<String, dynamic>);
+    try {
+      final res = await _dio.post('/chat/$userId', data: {'body': body});
+      return MessageModel.fromJson(res.data['message'] as Map<String, dynamic>);
+    } catch (e, stack) {
+      print("Error in sendMessage API for user $userId: $e");
+      print(stack);
+      rethrow;
+    }
+  }
+
+  Future<void> markAsRead(int userId) async {
+    try {
+      await _dio.post('/chat/$userId/read');
+    } catch (e, stack) {
+      print("Error in markAsRead API for user $userId: $e");
+      print(stack);
+      rethrow;
+    }
   }
 
   Future<int> getUnreadCount() async {
@@ -174,13 +220,19 @@ class ApiService {
         .cast<Map<String, dynamic>>();
   }
 
+  Future<Map<String, dynamic>> buyVip(String package) async {
+    final res = await _dio.post('/vip/buy', data: {'package': package});
+    return res.data as Map<String, dynamic>;
+  }
+
   // ─── Profile ──────────────────────────────────────────────────────────────
 
-  Future<UserModel> updateProfile({String? name, String? bio, String? country}) async {
+  Future<UserModel> updateProfile({String? name, String? bio, String? country, bool? isIncognito}) async {
     final res = await _dio.put('/profile', data: {
       if (name != null) 'name': name,
       if (bio != null) 'bio': bio,
       if (country != null) 'country': country,
+      if (isIncognito != null) 'is_incognito': isIncognito,
     });
     return UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
   }

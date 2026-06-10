@@ -472,7 +472,7 @@ class _AgencyScreenState extends State<AgencyScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit_outlined, color: Colors.white75, size: 20),
+                            icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
                             onPressed: () => _editCommission(member['id'], double.parse(member['commission_rate'].toString())),
                           ),
                           IconButton(

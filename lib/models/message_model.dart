@@ -17,14 +17,33 @@ class MessageModel {
     required this.createdAt,
   });
 
+  static DateTime _parseDateTime(dynamic val) {
+    if (val == null) return DateTime.now();
+    final str = val.toString();
+    try {
+      return DateTime.parse(str);
+    } catch (_) {
+      try {
+        final parts = str.split(':');
+        if (parts.length >= 2) {
+          final now = DateTime.now();
+          final hour = int.parse(parts[0]);
+          final minute = int.parse(parts[1]);
+          return DateTime(now.year, now.month, now.day, hour, minute);
+        }
+      } catch (_) {}
+      return DateTime.now();
+    }
+  }
+
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
       id:        json['id'] as int,
-      body:      json['body'] as String? ?? '',
+      body:      json['body'] as String? ?? json['translated_text'] as String? ?? json['original_text'] as String? ?? '',
       type:      json['type'] as String? ?? 'text',
       isMine:    json['is_mine'] as bool? ?? false,
       isRead:    json['is_read'] as bool? ?? false,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseDateTime(json['created_at']),
     );
   }
 }
@@ -68,10 +87,39 @@ class LastMessage {
 
   factory LastMessage.fromJson(Map<String, dynamic> json) {
     return LastMessage(
-      body:      json['body'] as String? ?? '',
+      body:      json['body'] as String? ?? json['translated_text'] as String? ?? json['original_text'] as String? ?? '',
       type:      json['type'] as String? ?? 'text',
       isMine:    json['is_mine'] as bool? ?? false,
       isRead:    json['is_read'] as bool? ?? false,
+      createdAt: MessageModel._parseDateTime(json['created_at']),
+    );
+  }
+}
+
+class CallLogItem {
+  final int id;
+  final UserModel user;
+  final String type; // 'call_ended' | 'call_missed'
+  final int duration; // saniye cinsinden
+  final String direction; // 'incoming' | 'outgoing'
+  final DateTime createdAt;
+
+  CallLogItem({
+    required this.id,
+    required this.user,
+    required this.type,
+    required this.duration,
+    required this.direction,
+    required this.createdAt,
+  });
+
+  factory CallLogItem.fromJson(Map<String, dynamic> json) {
+    return CallLogItem(
+      id:        json['id'] as int,
+      user:      UserModel.fromJson(json['user'] as Map<String, dynamic>),
+      type:      json['type'] as String? ?? 'call_ended',
+      duration:  json['duration'] as int? ?? 0,
+      direction: json['direction'] as String? ?? 'incoming',
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

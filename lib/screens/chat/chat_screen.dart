@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/user_model.dart';
 import '../../models/message_model.dart';
 import '../../services/api_service.dart';
+import '../../services/pusher_service.dart';
+import '../../providers/auth_provider.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel partner;
@@ -15,17 +19,79 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ApiService _api      = ApiService();
+  final PusherService _pusher = PusherService();
   final _msgCtrl             = TextEditingController();
   final _scrollCtrl          = ScrollController();
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  String? _pusherChannel;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+    _initPusher();
+  }
 
   @override
-  void dispose() { _msgCtrl.dispose(); _scrollCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    if (_pusherChannel != null) {
+      _pusher.unsubscribe(_pusherChannel!);
+    }
+    _msgCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _initPusher() {
+    final myId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+    if (myId == null) return;
+
+    _pusherChannel = 'private-chat.$myId';
+    _pusher.subscribe(_pusherChannel!, (event) {
+      debugPrint("Pusher Chat Event: ${event.eventName}");
+      
+      final Map<String, dynamic> data = event.data is String 
+          ? jsonDecode(event.data) 
+          : (event.data as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+
+      if (event.eventName.endsWith('MessageSent')) {
+        final senderId = data['sender_id'] as int?;
+        if (senderId == widget.partner.id) {
+          final newMsg = MessageModel.fromJson(data);
+          if (mounted) {
+            setState(() {
+              _messages.add(newMsg);
+            });
+            _scrollToBottom();
+            _api.markAsRead(widget.partner.id).catchError((_) {});
+          }
+        }
+      } else if (event.eventName.endsWith('MessageRead')) {
+        final readerId = (data['readerId'] ?? data['reader_id']) as int?;
+        if (readerId == widget.partner.id) {
+          if (mounted) {
+            setState(() {
+              _messages = _messages.map((m) {
+                if (m.isMine && !m.isRead) {
+                  return MessageModel(
+                    id: m.id,
+                    body: m.body,
+                    type: m.type,
+                    isMine: m.isMine,
+                    isRead: true,
+                    createdAt: m.createdAt,
+                  );
+                }
+                return m;
+              }).toList();
+            });
+          }
+        }
+      }
+    });
+  }
 
   Future<void> _load() async {
     try {
@@ -35,6 +101,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _isLoading = false;
       });
       _scrollToBottom();
+      _api.markAsRead(widget.partner.id).catchError((e) {
+        debugPrint("Error marking messages as read: $e");
+      });
     } catch (e) { setState(() => _isLoading = false); }
   }
 
@@ -85,9 +154,9 @@ class _ChatScreenState extends State<ChatScreen> {
     title: Row(children: [
       Stack(children: [
         CircleAvatar(radius: 20, backgroundColor: AppTheme.cardColor,
-          backgroundImage: widget.partner.avatarUrl != null
-            ? CachedNetworkImageProvider(widget.partner.avatarUrl!) : null,
-          child: widget.partner.avatarUrl == null
+          backgroundImage: widget.partner.firstPhotoUrl != null
+            ? CachedNetworkImageProvider(widget.partner.firstPhotoUrl!) : null,
+          child: widget.partner.firstPhotoUrl == null
             ? Icon(Icons.person, color: AppTheme.textSecondary) : null),
         if (widget.partner.isOnline)
           Positioned(bottom: 1, right: 1, child: Container(
@@ -99,9 +168,15 @@ class _ChatScreenState extends State<ChatScreen> {
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(widget.partner.name,
           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        Text(widget.partner.isOnline ? 'Çevrimiçi' : 'Çevrimdışı',
-          style: TextStyle(color: widget.partner.isOnline
-            ? const Color(0xFF10B981) : AppTheme.textSecondary, fontSize: 12)),
+        Text(
+          widget.partner.isOnline
+              ? 'Çevrimiçi'
+              : _formatLastSeen(widget.partner.lastSeenAt, widget.partner.isOnline),
+          style: TextStyle(
+            color: widget.partner.isOnline ? const Color(0xFF10B981) : AppTheme.textSecondary,
+            fontSize: 12,
+          ),
+        ),
       ]),
     ]),
     actions: [
@@ -178,7 +253,12 @@ class _ChatScreenState extends State<ChatScreen> {
               )),
               IconButton(
                 icon: Icon(Icons.attach_file_rounded, color: AppTheme.textSecondary),
-                onPressed: () {},
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Fotoğraf/Dosya gönderme özelliği yakında! 🚀'),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                },
               ),
             ]),
           ),
@@ -202,5 +282,29 @@ class _ChatScreenState extends State<ChatScreen> {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  String _formatLastSeen(String? lastSeenIso, bool isOnline) {
+    if (isOnline) return 'Çevrimiçi';
+    if (lastSeenIso == null) return 'Çevrimdışı';
+    try {
+      final dt = DateTime.parse(lastSeenIso).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+
+      if (diff.inMinutes < 5) return 'Çevrimiçi';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+      if (diff.inHours < 24) return '${diff.inHours} sa önce';
+
+      final yesterday = DateTime(now.year, now.month, now.day - 1);
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        return 'Bugün ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } else if (dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day) {
+        return 'Dün ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return 'Çevrimdışı';
+    }
   }
 }

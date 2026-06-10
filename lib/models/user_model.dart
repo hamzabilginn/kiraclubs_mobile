@@ -11,10 +11,12 @@ class UserModel {
   final String? referralCode;
   final String? vipLevel;
   final bool isVip;
+  final bool isIncognito;
   final String? verificationStatus;
   final int level;
   final String rankName;
   final int levelProgress;
+  final int xpPoints;
   final bool isOnline;
   final String? lastSeenAt;
   final bool isAdmin;
@@ -45,10 +47,12 @@ class UserModel {
     this.referralCode,
     this.vipLevel,
     this.isVip = false,
+    this.isIncognito = false,
     this.verificationStatus,
     this.level = 1,
     this.rankName = 'Bronz I',
     this.levelProgress = 0,
+    this.xpPoints = 0,
     this.isOnline = false,
     this.lastSeenAt,
     this.isAdmin = false,
@@ -77,10 +81,12 @@ class UserModel {
       referralCode:       json['referral_code'] as String?,
       vipLevel:           json['vip_level'] as String?,
       isVip:              json['is_vip'] as bool? ?? false,
+      isIncognito:        json['is_incognito'] as bool? ?? false,
       verificationStatus: json['verification_status'] as String?,
       level:              json['level'] as int? ?? 1,
       rankName:           json['rank_name'] as String? ?? 'Bronz I',
       levelProgress:      json['level_progress'] as int? ?? 0,
+      xpPoints:           json['xp_points'] as int? ?? 0,
       isOnline:           json['is_online'] as bool? ?? false,
       lastSeenAt:         json['last_seen_at'] as String?,
       isAdmin:            json['is_admin'] as bool? ?? false,
@@ -115,10 +121,12 @@ class UserModel {
     'referral_code':       referralCode,
     'vip_level':           vipLevel,
     'is_vip':              isVip,
+    'is_incognito':        isIncognito,
     'verification_status': verificationStatus,
     'level':               level,
     'rank_name':           rankName,
     'level_progress':      levelProgress,
+    'xp_points':           xpPoints,
     'is_online':           isOnline,
     'last_seen_at':        lastSeenAt,
     'is_admin':            isAdmin,
@@ -137,12 +145,14 @@ class UserModel {
     String? referralCode,
     String? vipLevel,
     bool? isVip,
+    bool? isIncognito,
     int? tokens,
     int? earnedCoins,
     List<MediaItem>? media,
     int? followersCount,
     int? followingCount,
     int? totalLikes,
+    int? xpPoints,
   }) {
     return UserModel(
       id:                 id,
@@ -155,6 +165,7 @@ class UserModel {
       referralCode:       referralCode ?? this.referralCode,
       vipLevel:           vipLevel ?? this.vipLevel,
       isVip:              isVip ?? this.isVip,
+      isIncognito:        isIncognito ?? this.isIncognito,
       verificationStatus: verificationStatus,
       level:              level,
       rankName:           rankName,
@@ -173,7 +184,27 @@ class UserModel {
       statuses:           statuses,
       agencyName:         agencyName,
       isAgencyOwner:      isAgencyOwner,
+      xpPoints:           xpPoints ?? this.xpPoints,
     );
+  }
+
+  String? get firstPhotoUrl {
+    for (var m in media) {
+      if (m.type == 'photo' || m.type == 'image') {
+        if (m.url.trim().isEmpty) continue;
+        final url = m.url.toLowerCase();
+        if (!url.endsWith('.mov') && !url.endsWith('.mp4') && !url.endsWith('.avi') && !url.endsWith('.mkv') && !url.endsWith('.webm')) {
+          return m.url;
+        }
+      }
+    }
+    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) {
+      final url = avatarUrl!.toLowerCase();
+      if (!url.endsWith('.mov') && !url.endsWith('.mp4') && !url.endsWith('.avi') && !url.endsWith('.mkv') && !url.endsWith('.webm')) {
+        return avatarUrl;
+      }
+    }
+    return null;
   }
 }
 

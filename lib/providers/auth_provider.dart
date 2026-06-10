@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/user_model.dart';
 import '../config/constants.dart';
+import '../services/pusher_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _user;
@@ -30,6 +31,7 @@ class AuthProvider extends ChangeNotifier {
       _token = token;
       try {
         _user = await _api.getMe();
+        PusherService().init(token: token);
       } catch (_) {
         // Token geçersiz — temizle
         await _clearSession(prefs);
@@ -111,6 +113,7 @@ class AuthProvider extends ChangeNotifier {
     _user  = UserModel.fromJson(data['user'] as Map<String, dynamic>);
     await prefs.setString(AppConstants.tokenKey, _token!);
     await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    PusherService().init(token: _token!);
     notifyListeners();
   }
 
@@ -119,6 +122,7 @@ class AuthProvider extends ChangeNotifier {
     _user  = null;
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.userKey);
+    PusherService().disconnect();
   }
 
   void _setLoading(bool val) {

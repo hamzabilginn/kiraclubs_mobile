@@ -3,6 +3,8 @@ allprojects {
         google()
         mavenCentral()
     }
+    project.ext.set("compileSdkVersion", 34)
+    project.ext.set("targetSdkVersion", 34)
 }
 
 val newBuildDir: Directory =
@@ -20,14 +22,10 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Force all Android library subprojects (e.g. agora_rtc_engine)
-// to compile against SDK 36 so they don't conflict with our app.
-// plugins.withId fires at plugin-application time, BEFORE evaluation,
-// which avoids the "cannot run afterEvaluate when already evaluated" error.
 subprojects {
     plugins.withId("com.android.library") {
         extensions.configure<com.android.build.gradle.LibraryExtension> {
-            compileSdk = 36
+            compileSdk = 34
             defaultConfig {
                 ndk {
                     abiFilters.addAll(setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))

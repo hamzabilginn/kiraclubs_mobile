@@ -9,6 +9,7 @@ import 'chat_screen.dart';
 import '../profile/public_profile_screen.dart';
 import '../profile/likers_screen.dart';
 import '../profile/visitors_screen.dart';
+import '../call/call_screen.dart';
 
 
 class InboxScreen extends StatefulWidget {
@@ -27,6 +28,9 @@ class _InboxScreenState extends State<InboxScreen>
   List<ConversationModel> _conversations = [];
   bool _loadingMessages = true;
 
+  // Calls
+  List<CallLogItem> _calls = [];
+
   // Likers (beğenenler)
   List<Map<String, dynamic>> _likers = [];
   bool _loadingLikers = true;
@@ -38,13 +42,14 @@ class _InboxScreenState extends State<InboxScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) return;
       switch (_tabController.index) {
         case 0: _loadMessages(); break;
-        case 1: _loadLikers(); break;
-        case 2: _loadVisitors(); break;
+        case 1: _loadMessages(); break;
+        case 2: _loadLikers(); break;
+        case 3: _loadVisitors(); break;
       }
     });
     _loadMessages();
@@ -59,8 +64,14 @@ class _InboxScreenState extends State<InboxScreen>
   Future<void> _loadMessages() async {
     setState(() => _loadingMessages = true);
     try {
-      final convs = await _api.getInbox();
-      if (mounted) setState(() { _conversations = convs; _loadingMessages = false; });
+      final data = await _api.getInbox();
+      if (mounted) {
+        setState(() {
+          _conversations = data['conversations'] as List<ConversationModel>;
+          _calls = data['calls'] as List<CallLogItem>;
+          _loadingMessages = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingMessages = false);
     }
@@ -96,6 +107,7 @@ class _InboxScreenState extends State<InboxScreen>
         controller: _tabController,
         children: [
           _messagesTab(),
+          _callsTab(),
           _likersTab(),
           _visitorsTab(),
         ],
@@ -138,6 +150,7 @@ class _InboxScreenState extends State<InboxScreen>
       padding: const EdgeInsets.all(4),
       tabs: const [
         Tab(icon: Icon(Icons.chat_bubble_outline_rounded, size: 16), text: 'Mesajlar'),
+        Tab(icon: Icon(Icons.call_outlined, size: 16), text: 'Aramalar'),
         Tab(icon: Icon(Icons.favorite_outline_rounded, size: 16), text: 'Beğenenler'),
         Tab(icon: Icon(Icons.remove_red_eye_outlined, size: 16), text: 'Ziyaretçiler'),
       ],
@@ -250,8 +263,14 @@ class _InboxScreenState extends State<InboxScreen>
             child: isLocked
               ? const ColoredBox(color: Color(0xFF1A1830),
                   child: Center(child: Text('🔒', style: TextStyle(fontSize: 24))))
-              : (sender?.avatarUrl != null
-                  ? CachedNetworkImage(imageUrl: sender!.avatarUrl!, fit: BoxFit.cover, width: 56, height: 56)
+              : (sender?.avatarUrl != null && sender!.avatarUrl!.trim().isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: sender!.avatarUrl!,
+                      fit: BoxFit.cover,
+                      width: 56,
+                      height: 56,
+                      errorWidget: (context, url, error) => Center(child: Icon(Icons.person, color: AppTheme.textSecondary, size: 28)),
+                    )
                   : Center(child: Icon(Icons.person, color: AppTheme.textSecondary, size: 28))),
           )),
           if (sender?.isVip == true && !isLocked)
@@ -321,8 +340,14 @@ class _InboxScreenState extends State<InboxScreen>
             width: 56, height: 56, color: const Color(0xFF1A1830),
             child: isLocked
               ? const Center(child: Text('🔒', style: TextStyle(fontSize: 24)))
-              : (viewer?.avatarUrl != null
-                  ? CachedNetworkImage(imageUrl: viewer!.avatarUrl!, fit: BoxFit.cover, width: 56, height: 56)
+              : (viewer?.avatarUrl != null && viewer!.avatarUrl!.trim().isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: viewer!.avatarUrl!,
+                      fit: BoxFit.cover,
+                      width: 56,
+                      height: 56,
+                      errorWidget: (context, url, error) => Center(child: Icon(Icons.person, color: AppTheme.textSecondary, size: 28)),
+                    )
                   : Center(child: Icon(Icons.person, color: AppTheme.textSecondary, size: 28))),
           )),
           if (viewer?.isVip == true && !isLocked)
@@ -360,11 +385,21 @@ class _InboxScreenState extends State<InboxScreen>
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  Widget _avatar(String? url, double radius) => CircleAvatar(
-    radius: radius, backgroundColor: AppTheme.cardColor,
-    backgroundImage: url != null ? CachedNetworkImageProvider(url) : null,
-    child: url == null ? Icon(Icons.person, color: AppTheme.textSecondary) : null,
-  );
+  Widget _avatar(String? url, double radius) {
+    final bool isVideo = url != null &&
+        (url.toLowerCase().endsWith('.mov') ||
+            url.toLowerCase().endsWith('.mp4') ||
+            url.toLowerCase().endsWith('.avi') ||
+            url.toLowerCase().endsWith('.mkv') ||
+            url.toLowerCase().endsWith('.webm'));
+    final bool hasValidImage = url != null && url.trim().isNotEmpty && !isVideo;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppTheme.cardColor,
+      backgroundImage: hasValidImage ? CachedNetworkImageProvider(url) : null,
+      child: !hasValidImage ? Icon(Icons.person, color: AppTheme.textSecondary) : null,
+    );
+  }
 
   Widget _vipDot(String? level) {
     final Color c = level == 'platinum' ? const Color(0xFF8B5CF6)
@@ -422,6 +457,100 @@ class _InboxScreenState extends State<InboxScreen>
         color: AppTheme.primaryColor, borderRadius: BorderRadius.circular(12),
         boxShadow: [BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 8)]),
       child: const Text('Profil', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))));
+
+  Widget _callsTab() => _loadingMessages
+    ? _shimmerList()
+    : _calls.isEmpty
+      ? _empty('Henüz araman yok', 'Geçmiş aramaların burada listelenir. 📞', Icons.call_outlined)
+      : RefreshIndicator(
+          onRefresh: _loadMessages,
+          color: AppTheme.primaryColor,
+          child: ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 20),
+            itemCount: _calls.length,
+            itemBuilder: (_, i) => _callTile(_calls[i])));
+
+  Widget _callTile(CallLogItem call) {
+    final otherUser = call.user;
+    final isOutgoing = call.direction == 'outgoing';
+    final isMissed = call.type == 'call_missed';
+
+    final minutes = call.duration ~/ 60;
+    final seconds = call.duration % 60;
+    final durationStr = call.duration > 0
+        ? '${minutes}:${seconds.toString().padLeft(2, '0')}'
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderCol),
+      ),
+      child: Row(children: [
+        Stack(children: [
+          _avatar(otherUser.avatarUrl, 28),
+          if (otherUser.isOnline)
+            Positioned(bottom: 2, right: 2, child: Container(
+              width: 12, height: 12, decoration: BoxDecoration(
+                color: const Color(0xFF10B981), shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.backgroundColor, width: 2)))),
+        ]),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(otherUser.name, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold))),
+            if (otherUser.isVip)
+              _vipBadge(otherUser.vipLevel),
+          ]),
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(
+              isOutgoing ? Icons.call_made_rounded : (isMissed ? Icons.call_missed_rounded : Icons.call_received_rounded),
+              size: 14,
+              color: isOutgoing ? Colors.blue : (isMissed ? Colors.red : Colors.green),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isOutgoing
+                  ? 'Giden Arama'
+                  : (isMissed ? 'Cevapsız Arama' : 'Gelen Arama'),
+              style: TextStyle(
+                color: isMissed ? Colors.red : AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: isMissed ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            if (durationStr != null) ...[
+              const SizedBox(width: 6),
+              Text('($durationStr)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+            ],
+          ]),
+          const SizedBox(height: 2),
+          Text('⏱ ${_timeAgo(call.createdAt)}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+        ])),
+        const SizedBox(width: 12),
+        _callbackBtn(() {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(chatUser: otherUser)));
+        }),
+      ]),
+    );
+  }
+
+  Widget _callbackBtn(VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: const Color(0xFF10B981).withOpacity(0.3), blurRadius: 8)]),
+      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.phone_enabled_rounded, color: Colors.white, size: 12),
+        SizedBox(width: 4),
+        Text('Geri Ara', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+      ])));
 
   Widget _shimmerList() => Shimmer.fromColors(
     baseColor: AppTheme.cardColor, highlightColor: const Color(0xFF2A2740),

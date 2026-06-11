@@ -576,4 +576,14 @@ class ApiService {
     final res = await _dio.post('/rooms/$roomId/emoji', data: {'emoji': emoji});
     return res.data as Map<String, dynamic>;
   }
+
+  Future<List<dynamic>> getRoomMessages(int roomId) async {
+    final res = await _dio.get('/rooms/$roomId/messages');
+    return res.data['messages'] as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> sendRoomMessage(int roomId, String message) async {
+    final res = await _dio.post('/rooms/$roomId/messages', data: {'message': message});
+    return res.data as Map<String, dynamic>;
+  }
 }

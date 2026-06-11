@@ -38,6 +38,13 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
   List<dynamic> _speakers = [];
   Timer? _heartbeatTimer;
 
+  // Chat integration
+  List<dynamic> _messages = [];
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _chatScrollController = ScrollController();
+  bool _showChatTab = false;
+  bool _hasNewMessages = false;
+
   // Emojis
   final List<_FloatingEmoji> _floatingEmojis = [];
   late AnimationController _emojiController;
@@ -57,6 +64,7 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
 
     _loadRoomState().then((_) {
       _initAgoraAndPusher();
+      _loadChatMessages();
     });
 
     // Heartbeat every 10 seconds
@@ -71,6 +79,8 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
   void dispose() {
     _heartbeatTimer?.cancel();
     _emojiController.dispose();
+    _messageController.dispose();
+    _chatScrollController.dispose();
     _leaveChannel();
     super.dispose();
   }
@@ -189,6 +199,25 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
       else if (event.eventName.endsWith('RoomEmojiSent')) {
         _spawnEmoji(data['emoji'] ?? '🔥');
       } 
+      else if (event.eventName.endsWith('RoomMessageSent')) {
+        final rawMsg = data['message'];
+        final Map<String, dynamic> messageData = rawMsg is String
+            ? jsonDecode(rawMsg)
+            : (rawMsg as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+        
+        final myId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+        final senderId = messageData['user']?['id'];
+        
+        if (senderId != myId) {
+          setState(() {
+            _messages.add(messageData);
+            if (!_showChatTab) {
+              _hasNewMessages = true;
+            }
+          });
+          _scrollToBottom();
+        }
+      }
       else if (event.eventName.endsWith('RoomInvitationSent')) {
         final myId = Provider.of<AuthProvider>(context, listen: false).user?.id;
         if (data['userId'] == myId && mounted) {
@@ -223,6 +252,121 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
     try {
       await _api.sendRoomEmoji(widget.room['id'], emoji);
     } catch (_) {}
+  }
+
+  Future<void> _loadChatMessages() async {
+    try {
+      final messagesRes = await _api.getRoomMessages(widget.room['id']);
+      setState(() {
+        _messages = messagesRes;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      debugPrint("Load Chat Messages Exception: $e");
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendChatMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    _messageController.clear();
+    
+    try {
+      final res = await _api.sendRoomMessage(widget.room['id'], text);
+      if (res['success'] == true) {
+        setState(() {
+          _messages.add(res['message']);
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint("Send Room Message Error: $e");
+    }
+  }
+
+  Widget _buildChatMessageNode(Map<String, dynamic> msg, bool isMe) {
+    final user = msg['user'] ?? {};
+    final String name = user['name'] ?? 'Kullanıcı';
+    final String? avatarUrl = user['avatar_url'];
+    final String messageText = msg['message'] ?? '';
+    final String vipLevel = user['vip_level'] ?? 'none';
+    final bool isVip = vipLevel != 'none';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundImage: avatarUrl != null ? CachedNetworkImageProvider(avatarUrl) : null,
+            backgroundColor: AppTheme.cardColor,
+            child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white30, size: 14) : null,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: isMe ? Colors.blueAccent : Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (isVip) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.2),
+                          border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('VIP', style: TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                    ]
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1F1C2F),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.zero,
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    messageText,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleMute() {
@@ -524,7 +668,7 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
 
               const Divider(color: Colors.white10, height: 1),
 
-              // Listeners Section
+              // Listeners / Chat Section
               Expanded(
                 flex: 5,
                 child: Container(
@@ -532,20 +676,124 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> with TickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('DİNLEYİCİLER (${_participants.length})', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      // Tab Header
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => setState(() => _showChatTab = false),
+                            child: Text(
+                              'DİNLEYİCİLER (${_participants.length})',
+                              style: TextStyle(
+                                color: !_showChatTab ? Colors.white : AppTheme.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _showChatTab = true;
+                                _hasNewMessages = false;
+                              });
+                              _scrollToBottom();
+                            },
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Text(
+                                  'SOHBET',
+                                  style: TextStyle(
+                                    color: _showChatTab ? Colors.white : AppTheme.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                if (_hasNewMessages && !_showChatTab)
+                                  Positioned(
+                                    right: -8,
+                                    top: -4,
+                                    child: Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       Expanded(
-                        child: GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 0.8),
-                          itemCount: _participants.length,
-                          itemBuilder: (context, index) {
-                            final listener = _participants[index];
-                            return GestureDetector(
-                              onTap: () => _manageUser(listener, false),
-                              child: _buildListenerNode(listener['name'] ?? '', listener['avatar_url'], listener['is_raising_hand'] == true),
-                            );
-                          },
-                        ),
+                        child: _showChatTab
+                            ? Column(
+                                children: [
+                                  Expanded(
+                                    child: _messages.isEmpty
+                                        ? const Center(child: Text('Henüz mesaj yok.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)))
+                                        : ListView.builder(
+                                            controller: _chatScrollController,
+                                            itemCount: _messages.length,
+                                            itemBuilder: (context, index) {
+                                              final msg = _messages[index];
+                                              final myId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+                                              final isMe = msg['user']?['id'] == myId;
+                                              return _buildChatMessageNode(msg, isMe);
+                                            },
+                                          ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _messageController,
+                                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                                          decoration: InputDecoration(
+                                            hintText: 'Mesaj yazın...',
+                                            hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+                                            filled: true,
+                                            fillColor: const Color(0xFF1F1C2F),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(20),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                          ),
+                                          onSubmitted: (_) => _sendChatMessage(),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      GestureDetector(
+                                        onTap: _sendChatMessage,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFFEC4899)]),
+                                          ),
+                                          child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                        ),
+                                      )
+                                    ],
+                                  )
+                                ],
+                              )
+                            : GridView.builder(
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 0.8),
+                                itemCount: _participants.length,
+                                itemBuilder: (context, index) {
+                                  final listener = _participants[index];
+                                  return GestureDetector(
+                                    onTap: () => _manageUser(listener, false),
+                                    child: _buildListenerNode(listener['name'] ?? '', listener['avatar_url'], listener['is_raising_hand'] == true),
+                                  );
+                                },
+                              ),
                       )
                     ],
                   ),

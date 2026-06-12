@@ -8,6 +8,10 @@ import '../chat/inbox_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../status/statuses_screen.dart';
 import '../room/rooms_screen.dart';
+import '../../services/pusher_service.dart';
+import '../../services/api_service.dart';
+import '../../models/user_model.dart';
+import '../call/call_screen.dart';
 
 class MainNavScreen extends StatefulWidget {
   const MainNavScreen({Key? key}) : super(key: key);
@@ -18,6 +22,171 @@ class MainNavScreen extends StatefulWidget {
 
 class _MainNavScreenState extends State<MainNavScreen> {
   int _currentIndex = 0;
+  BuildContext? _incomingCallDialogContext;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToIncomingCalls();
+  }
+
+  @override
+  void dispose() {
+    _unsubscribeFromIncomingCalls();
+    super.dispose();
+  }
+
+  void _subscribeToIncomingCalls() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.user;
+    if (user != null) {
+      PusherService().subscribe('private-user.${user.id}', (event) {
+        if (event.eventName == 'CallInvited') {
+          _showIncomingCallDialog(event.data);
+        } else if (event.eventName == 'CallSignal') {
+          final type = event.data['type'] as String?;
+          if (type == 'hang-up') {
+            _dismissIncomingCallDialog();
+            _dismissActiveCall();
+          }
+        }
+      });
+    }
+  }
+
+  void _unsubscribeFromIncomingCalls() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.user;
+    if (user != null) {
+      PusherService().unsubscribe('private-user.${user.id}');
+    }
+  }
+
+  void _dismissIncomingCallDialog() {
+    if (_incomingCallDialogContext != null) {
+      Navigator.of(_incomingCallDialogContext!).pop();
+      _incomingCallDialogContext = null;
+    }
+  }
+
+  void _dismissActiveCall() {
+    if (CallScreen.isActive) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
+  void _showIncomingCallDialog(dynamic data) {
+    if (data == null) return;
+    if (CallScreen.isActive || _incomingCallDialogContext != null) return;
+
+    final callerId = data['caller_id'] as int?;
+    final callerName = data['caller_name'] as String? ?? 'Bilinmeyen Arayan';
+    final callerAvatar = data['caller_avatar'] as String?;
+    final roomId = data['room_id'] as String?;
+
+    if (callerId == null || roomId == null) return;
+
+    final callerUser = UserModel(
+      id: callerId,
+      name: callerName,
+      avatarUrl: callerAvatar,
+    );
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        _incomingCallDialogContext = dialogContext;
+        return PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: const Color(0xFF131124),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Gelen Arama',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: AppTheme.cardColor,
+                    backgroundImage: callerAvatar != null && callerAvatar.isNotEmpty
+                        ? NetworkImage(callerAvatar)
+                        : null,
+                    child: callerAvatar == null || callerAvatar.isEmpty
+                        ? const Icon(Icons.person, size: 50, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    callerName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sizi görüntülü aramaya davet ediyor...',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      FloatingActionButton(
+                        heroTag: 'decline_dialog_btn',
+                        backgroundColor: Colors.red,
+                        onPressed: () async {
+                          _dismissIncomingCallDialog();
+                          try {
+                            await ApiService().endCall(callerId, duration: 0, wasConnected: false);
+                          } catch (e) {
+                            debugPrint('Error rejecting call: $e');
+                          }
+                        },
+                        child: const Icon(Icons.call_end, color: Colors.white),
+                      ),
+                      FloatingActionButton(
+                        heroTag: 'accept_dialog_btn',
+                        backgroundColor: Colors.green,
+                        onPressed: () {
+                          _dismissIncomingCallDialog();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CallScreen(chatUser: callerUser),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.call, color: Colors.white),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).then((_) {
+      _incomingCallDialogContext = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

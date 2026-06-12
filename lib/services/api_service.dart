@@ -324,6 +324,14 @@ class ApiService {
     return res.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> endCall(int userId, {int duration = 0, bool wasConnected = false}) async {
+    final res = await _dio.post('/call/$userId/end', data: {
+      'duration': duration,
+      'was_connected': wasConnected,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
   // ─── Statuses ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getStatuses({int page = 1}) async {

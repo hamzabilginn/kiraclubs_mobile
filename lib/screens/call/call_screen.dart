@@ -8,6 +8,7 @@ import '../../services/api_service.dart';
 
 class CallScreen extends StatefulWidget {
   final UserModel chatUser;
+  static bool isActive = false;
 
   const CallScreen({Key? key, required this.chatUser}) : super(key: key);
 
@@ -29,11 +30,13 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    CallScreen.isActive = true;
     _startRingSimulation();
   }
 
   @override
   void dispose() {
+    CallScreen.isActive = false;
     _ringTimer?.cancel();
     _destroyAgora();
     super.dispose();

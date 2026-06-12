@@ -5,6 +5,7 @@ import '../../config/theme.dart';
 import '../../widgets/gradient_button.dart';
 import '../home/main_nav_screen.dart';
 import 'register_screen.dart';
+import '../../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -35,6 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainNavScreen()),
       );
+      Future.delayed(const Duration(milliseconds: 600), () {
+        NotificationService.handlePendingNotification();
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(auth.errorMessage ?? 'Giriş başarısız.'),

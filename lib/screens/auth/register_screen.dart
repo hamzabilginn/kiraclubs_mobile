@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../widgets/gradient_button.dart';
 import '../home/main_nav_screen.dart';
+import '../../services/notification_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -49,6 +50,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         MaterialPageRoute(builder: (_) => const MainNavScreen()),
         (_) => false,
       );
+      Future.delayed(const Duration(milliseconds: 600), () {
+        NotificationService.handlePendingNotification();
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(auth.errorMessage ?? 'Kayıt başarısız.'),

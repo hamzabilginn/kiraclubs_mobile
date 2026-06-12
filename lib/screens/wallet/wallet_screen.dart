@@ -197,48 +197,6 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  Future<void> _submitDeposit() async {
-    if (!_depositFormKey.currentState!.validate()) return;
-
-    setState(() => _isSubmittingDeposit = true);
-    try {
-      final amt = double.parse(_depositAmountController.text.trim());
-      final res = await _api.createDepositRequest(
-        usdtAmount: amt,
-        paymentMethod: _depositMethod,
-        senderName: _depositMethod == 'bank' ? _depositSenderNameController.text.trim() : null,
-        txid: _depositMethod == 'crypto' ? _depositTxidController.text.trim() : null,
-      );
-
-      _depositAmountController.clear();
-      _depositSenderNameController.clear();
-      _depositTxidController.clear();
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            title: const Text('Başarılı', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            content: Text(res['message'] ?? 'Yatırım bildiriminiz başarıyla iletildi.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _loadWallet();
-                },
-                child: const Text('Tamam'),
-              )
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      _showToast('Hata: $e');
-    } finally {
-      setState(() => _isSubmittingDeposit = false);
-    }
-  }
 
   Future<void> _submitWithdrawal(double userBalance, String country) async {
     if (!_withdrawFormKey.currentState!.validate()) return;

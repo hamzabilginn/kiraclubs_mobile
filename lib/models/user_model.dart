@@ -80,17 +80,17 @@ class UserModel {
       avatarUrl:          json['avatar_url'] as String?,
       referralCode:       json['referral_code'] as String?,
       vipLevel:           json['vip_level'] as String?,
-      isVip:              json['is_vip'] as bool? ?? false,
-      isIncognito:        json['is_incognito'] as bool? ?? false,
+      isVip:              _parseBool(json['is_vip']),
+      isIncognito:        _parseBool(json['is_incognito']),
       verificationStatus: json['verification_status'] as String?,
       level:              json['level'] as int? ?? 1,
       rankName:           json['rank_name'] as String? ?? 'Bronz I',
       levelProgress:      json['level_progress'] as int? ?? 0,
       xpPoints:           json['xp_points'] as int? ?? 0,
-      isOnline:           json['is_online'] as bool? ?? false,
+      isOnline:           _parseBool(json['is_online']),
       lastSeenAt:         json['last_seen_at'] as String?,
-      isAdmin:            json['is_admin'] as bool? ?? false,
-      isPublisher:        json['is_publisher'] as bool? ?? false,
+      isAdmin:            _parseBool(json['is_admin']),
+      isPublisher:        _parseBool(json['is_publisher']),
       tokens:             json['tokens'] as int? ?? 0,
       earnedCoins:        json['earned_coins'] as int? ?? 0,
       media:              (json['media'] as List<dynamic>?)
@@ -106,7 +106,7 @@ class UserModel {
           ?.map((s) => StatusPost.fromJson(s))
           .toList() ?? [],
       agencyName:         json['agency_name'] as String?,
-      isAgencyOwner:      json['is_agency_owner'] as bool? ?? false,
+      isAgencyOwner:      _parseBool(json['is_agency_owner']),
     );
   }
 
@@ -263,7 +263,18 @@ class StatusPost {
       content:    json['content'] as String? ?? '',
       createdAt:  DateTime.parse(json['created_at'] as String),
       likesCount: json['likes_count'] as int? ?? 0,
-      isLiked:    json['is_liked'] as bool? ?? false,
+      isLiked:    _parseBool(json['is_liked']),
     );
   }
+}
+
+bool _parseBool(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is int) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    return lower == 'true' || lower == '1';
+  }
+  return false;
 }

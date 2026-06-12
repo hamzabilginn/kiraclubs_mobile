@@ -93,7 +93,13 @@ class _CallScreenState extends State<CallScreen> {
         token: callInfo['agora_token'],
         channelId: _channelName!,
         uid: 0,
-        options: const ChannelMediaOptions(),
+        options: const ChannelMediaOptions(
+          publishCameraTrack: true,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        ),
       );
     } catch (e) {
       // Fallback for emulator environments/errors

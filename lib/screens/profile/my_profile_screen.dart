@@ -53,6 +53,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
   }
 
   Future<void> _loadProfileData() async {
+    if (!_isLoading) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await _api.getMeWithTasks();
       if (mounted) {
@@ -69,6 +72,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        _showToast('Hata: $e', isError: true);
       }
     }
   }
@@ -204,10 +208,90 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    if (_user == null && _isLoading) {
+    if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F0D1A),
         body: Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
+      );
+    }
+
+    if (_user == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0F0D1A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0F0D1A),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          ),
+          title: const Text('Profil', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Profil Yüklenemedi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Profil bilgileri sunucudan alınamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin veya yeniden giriş yapın.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadProfileData,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Yeniden Dene'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () async {
+                    final auth = Provider.of<AuthProvider>(context, listen: false);
+                    await auth.logout();
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (_) => false,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                  label: const Text('Çıkış Yap', style: TextStyle(color: Colors.redAccent)),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

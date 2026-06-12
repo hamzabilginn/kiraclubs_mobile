@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../services/api_service.dart';
@@ -42,7 +43,7 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isSubmittingWithdraw = false;
 
   // In-App Purchase Fields
-  final InAppPurchase _iap = InAppPurchase.instance;
+  late final InAppPurchase _iap;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   List<ProductDetails> _products = [];
   bool _iapAvailable = true;
@@ -53,7 +54,15 @@ class _WalletScreenState extends State<WalletScreen> {
   void initState() {
     super.initState();
     _loadWallet();
-    _initInAppPurchase();
+    if (!kIsWeb) {
+      _iap = InAppPurchase.instance;
+      _initInAppPurchase();
+    } else {
+      setState(() {
+        _iapAvailable = false;
+        _productsLoading = false;
+      });
+    }
   }
 
   @override

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../config/theme.dart';
+import '../../config/constants.dart';
 import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
 import '../profile/edit_profile_screen.dart';
@@ -17,7 +20,6 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   final ApiService _api = ApiService();
-  final _depositFormKey = GlobalKey<FormState>();
   final _withdrawFormKey = GlobalKey<FormState>();
 
   Map<String, dynamic> _wallet = {
@@ -29,39 +31,136 @@ class _WalletScreenState extends State<WalletScreen> {
   };
   bool _isLoading = true;
   String _activeTab = 'deposit'; // 'deposit' or 'withdraw'
-  String _depositMethod = 'bank'; // 'bank' or 'crypto'
 
   // Controllers
-  final TextEditingController _depositAmountController = TextEditingController();
-  final TextEditingController _depositSenderNameController = TextEditingController();
-  final TextEditingController _depositTxidController = TextEditingController();
-
   final TextEditingController _withdrawAmountController = TextEditingController();
   final TextEditingController _withdrawIbanController = TextEditingController();
   final TextEditingController _withdrawAccountNameController = TextEditingController();
   final TextEditingController _withdrawBankNameController = TextEditingController();
   final TextEditingController _withdrawCryptoAddressController = TextEditingController();
 
-  bool _isSubmittingDeposit = false;
   bool _isSubmittingWithdraw = false;
+
+  // In-App Purchase Fields
+  final InAppPurchase _iap = InAppPurchase.instance;
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
+  List<ProductDetails> _products = [];
+  bool _iapAvailable = true;
+  bool _productsLoading = true;
+  bool _purchasePending = false;
 
   @override
   void initState() {
     super.initState();
     _loadWallet();
+    _initInAppPurchase();
   }
 
   @override
   void dispose() {
-    _depositAmountController.dispose();
-    _depositSenderNameController.dispose();
-    _depositTxidController.dispose();
+    _subscription?.cancel();
     _withdrawAmountController.dispose();
     _withdrawIbanController.dispose();
     _withdrawAccountNameController.dispose();
     _withdrawBankNameController.dispose();
     _withdrawCryptoAddressController.dispose();
     super.dispose();
+  }
+
+  void _initInAppPurchase() {
+    final Stream<List<PurchaseDetails>> purchaseUpdated = _iap.purchaseStream;
+    _subscription = purchaseUpdated.listen((purchaseDetailsList) {
+      _listenToPurchaseUpdated(purchaseDetailsList);
+    }, onDone: () {
+      _subscription?.cancel();
+    }, onError: (error) {
+      _showToast("Ödeme servisi hatası: $error");
+    });
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final bool available = await _iap.isAvailable();
+      if (!available) {
+        setState(() {
+          _iapAvailable = false;
+          _productsLoading = false;
+        });
+        return;
+      }
+
+      final ProductDetailsResponse response = await _iap.queryProductDetails(
+        AppConstants.tokenProducts.toSet(),
+      );
+
+      if (response.notFoundIDs.isNotEmpty) {
+        print("Not found product IDs: ${response.notFoundIDs}");
+      }
+
+      setState(() {
+        _products = response.productDetails;
+        // Sort products by coin/token count
+        _products.sort((a, b) {
+          final aVal = AppConstants.tokenAmounts[a.id] ?? 0;
+          final bVal = AppConstants.tokenAmounts[b.id] ?? 0;
+          return aVal.compareTo(bVal);
+        });
+        _productsLoading = false;
+      });
+    } catch (e) {
+      print("Error loading products: $e");
+      setState(() {
+        _productsLoading = false;
+      });
+    }
+  }
+
+  void _buyProduct(ProductDetails productDetails) {
+    final PurchaseParam purchaseParam = PurchaseParam(productDetails: productDetails);
+    setState(() => _purchasePending = true);
+    _iap.buyConsumable(purchaseParam: purchaseParam);
+  }
+
+  Future<void> _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
+    for (var purchaseDetails in purchaseDetailsList) {
+      if (purchaseDetails.status == PurchaseStatus.pending) {
+        setState(() => _purchasePending = true);
+      } else {
+        if (purchaseDetails.status == PurchaseStatus.error) {
+          setState(() => _purchasePending = false);
+          _showToast("Satın alım iptal edildi veya bir hata oluştu.");
+          print("Purchase error: ${purchaseDetails.error}");
+        } else if (purchaseDetails.status == PurchaseStatus.purchased ||
+                   purchaseDetails.status == PurchaseStatus.restored) {
+          final success = await _verifyPurchaseOnBackend(purchaseDetails);
+          setState(() => _purchasePending = false);
+          if (success) {
+            _showToast("Tebrikler! Jetonlar hesabınıza yüklendi. 🎉");
+            _loadWallet();
+          } else {
+            _showToast("Ödeme doğrulanırken bir hata oluştu.");
+          }
+        }
+        if (purchaseDetails.pendingCompletePurchase) {
+          await _iap.completePurchase(purchaseDetails);
+        }
+      }
+    }
+  }
+
+  Future<bool> _verifyPurchaseOnBackend(PurchaseDetails purchaseDetails) async {
+    try {
+      final token = purchaseDetails.verificationData.serverVerificationData;
+      final res = await _api.verifyGooglePlayPurchase(
+        productId: purchaseDetails.productID,
+        purchaseToken: token,
+      );
+      return res['success'] == true;
+    } catch (e) {
+      print("Verification failed on backend: $e");
+      return false;
+    }
   }
 
   Future<void> _loadWallet() async {
@@ -398,318 +497,164 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildDepositPanel(dynamic user) {
-    final country = user?.country ?? 'TR';
-    final isTr = country == 'TR';
+    if (_productsLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(40.0),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
+      );
+    }
 
-    const bankIban = 'TR66 0006 2001 2690 0006 6579 61';
-    const bankName = 'Garanti BBVA';
-    const bankOwner = 'Mustafa Hazar Bilgin';
-    const cryptoAddress = 'TQtbWHFj89guzBTpEsWTxNd5svBMjJvcLY';
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Form(
-        key: _depositFormKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    if (!_iapAvailable || _products.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B).withOpacity(0.4),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: const Column(
           children: [
-            if (!isTr) ...[
-              _buildDepositMethodSelector(),
-              const SizedBox(height: 16),
-            ],
-
-            // Payment Instructions Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.5),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_depositMethod == 'bank' || isTr) ...[
-                    const Text('🏦 Banka Havalesi / IBAN Bilgileri', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 16),
-                    _buildInstructionRow('BANKA ADI', bankName),
-                    _buildInstructionRow('HESAP SAHİBİ (ALICI)', bankOwner),
-                    _buildInstructionRowWithCopy('IBAN NUMARASI', bankIban),
-                  ] else ...[
-                    const Text('🪙 USDT TRC20 Yatırma Adresi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 16),
-                    _buildInstructionRow('AĞ (NETWORK)', 'USDT TRC-20 (TRON)'),
-                    _buildInstructionRowWithCopy('CÜZDAN ADRESİ', cryptoAddress),
-                  ],
-                ],
-              ),
+            Text('⚠️', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 16),
+            Text(
+              'Ödeme Servisi Hazırlanıyor',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            const SizedBox(height: 16),
-
-            // Exchange Rate Info
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.3),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.03)),
-              ),
-              child: const Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text('Kur Oranı', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                        SizedBox(height: 4),
-                        Text('1 USD = 30 Kredi', style: TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  VerticalDivider(color: Colors.white10),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text('Min. Yatırım', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                        SizedBox(height: 4),
-                        Text('1 USD (30 Kredi)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            SizedBox(height: 8),
+            Text(
+              'Uygulama içi ödeme servisi şu anda yüklenemedi. Lütfen internet bağlantınızı kontrol edin veya Google Play Store\'un açık olduğundan emin olun.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
             ),
-            const SizedBox(height: 20),
-
-            // Quick Packages
-            const Text(
-              '⚡ HIZLI PAKETLER',
-              style: TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.1),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _buildQuickPackageCard('150 Kredi', '5 USD', 5),
-                const SizedBox(width: 8),
-                _buildQuickPackageCard('300 Kredi', '10 USD', 10),
-                const SizedBox(width: 8),
-                _buildQuickPackageCard('1500 Kredi', '50 USD', 50),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Input Fields
-            const Text('YATIRIM BİLDİRİMİ', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _depositAmountController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Lütfen tutar girin.';
-                final a = double.tryParse(v);
-                if (a == null || a <= 0) return 'Geçersiz tutar.';
-                return null;
-              },
-              decoration: InputDecoration(
-                labelText: 'Yatırılan Tutar (USD)',
-                labelStyle: const TextStyle(color: Colors.white70),
-                filled: true,
-                fillColor: const Color(0xFF1E293B).withOpacity(0.4),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6366F1))),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            if (_depositMethod == 'bank' || isTr)
-              TextFormField(
-                controller: _depositSenderNameController,
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Lütfen ad soyad girin.' : null,
-                decoration: InputDecoration(
-                  labelText: 'Gönderen Ad Soyad',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  filled: true,
-                  fillColor: const Color(0xFF1E293B).withOpacity(0.4),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6366F1))),
-                ),
-              )
-            else
-              TextFormField(
-                controller: _depositTxidController,
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Lütfen TXID girin.' : null,
-                decoration: InputDecoration(
-                  labelText: 'İşlem Kodu (TXID)',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  filled: true,
-                  fillColor: const Color(0xFF1E293B).withOpacity(0.4),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6366F1))),
-                ),
-              ),
-            const SizedBox(height: 20),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSubmittingDeposit ? null : _submitDeposit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isSubmittingDeposit
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('🚀 Kredi Yükleme Talebi Oluştur', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Instructions
-            _buildInstructionsList(_depositMethod == 'bank' || isTr),
-            const SizedBox(height: 24),
-
-            // Deposit history list
-            _buildDepositHistory(),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildDepositMethodSelector() {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withOpacity(0.4),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _depositMethod = 'bank'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _depositMethod == 'bank' ? const Color(0xFF0F0D1A) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _depositMethod == 'bank' ? const Color(0xFF6366F1).withOpacity(0.4) : Colors.transparent,
-                    width: 1,
-                  ),
-                ),
-                child: const Center(
-                  child: Text(
-                    '🏦 Banka Havalesi',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _depositMethod = 'crypto'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _depositMethod == 'crypto' ? const Color(0xFF0F0D1A) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _depositMethod == 'crypto' ? const Color(0xFF6366F1).withOpacity(0.4) : Colors.transparent,
-                    width: 1,
-                  ),
-                ),
-                child: const Center(
-                  child: Text(
-                    '🪙 Kripto (USDT TRC20)',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickPackageCard(String title, String subtitle, double amount) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _depositAmountController.text = amount.toStringAsFixed(0);
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B).withOpacity(0.3),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
-          ),
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+              const Text(
+                '🪙 JETON YÜKLE',
+                style: TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.1),
+              ),
               const SizedBox(height: 4),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w900, fontSize: 14)),
+              const Text(
+                'Satın aldığınız jetonlar hesabınıza anında tanımlanır. Güvenli ödemeler Google Play aracılığıyla gerçekleştirilir.',
+                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+
+              // Product Grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.95,
+                ),
+                itemCount: _products.length,
+                itemBuilder: (ctx, index) {
+                  final product = _products[index];
+                  final tokens = AppConstants.tokenAmounts[product.id] ?? 0;
+                  
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Coin Icon & Badge
+                        Column(
+                          children: [
+                            const Text('🪙', style: TextStyle(fontSize: 32)),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$tokens Kredi',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        // Buy Button
+                        GestureDetector(
+                          onTap: () => _buyProduct(product),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6366F1).withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                product.price,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              _buildDepositHistory(),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInstructionsList(bool isBank) {
-    final title = isBank ? 'Banka Havalesi ile Yatırım Adımları' : 'Kripto ile Nasıl Yatırım Yapılır?';
-    final steps = isBank
-        ? [
-            'Yukarıda belirtilen IBAN numarasına yatırmak istediğiniz tutarın karşılığı olan Türk Lirası veya Dolar tutarını gönderin.',
-            'Gönderim yaparken açıklama kısmına KiraClubs kullanıcı adınızı yazın.',
-            'Transferi tamamladıktan sonra, yukarıdaki forma yatırdığınız dolar miktarını ve gönderici ad soyad bilgisini girin.',
-            '"Kredi Yükleme Talebi Oluştur" butonuna tıklayarak talebinizi iletin.',
-            'Müşteri temsilcilerimiz işlemi onayladığında krediniz anında hesabınıza yüklenecektir.'
-          ]
-        : [
-            'Binance, Paribu, BtcTurk gibi bir borsaya girin veya kayıt olun.',
-            'Cüzdanınızdan Tether (USDT) alımı yapın.',
-            'Çekme (Withdraw) bölümüne gelip para birimi olarak USDT seçin.',
-            'Ağ (Network) olarak KESİNLİKLE TRON (TRC20) ağını seçin.',
-            'Yukarıda yazan Yatırma Adresini kopyalayıp borsadaki alıcı adresi kısmına yapıştırın.',
-            'Tutar girip gönderin. Gönderim tamamlanınca yukarıdaki forma miktarı yazıp bize bildirin! (Otomatik olarak krediniz yüklenecektir).'
-          ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('ℹ️ $title', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 12),
-          ...steps.asMap().entries.map((entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        if (_purchasePending)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${entry.key + 1}. ', style: const TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 12)),
-                    Expanded(child: Text(entry.value, style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.4))),
+                    CircularProgressIndicator(color: Color(0xFF6366F1)),
+                    SizedBox(height: 16),
+                    Text(
+                      'Satın alım işlemi gerçekleştiriliyor...\nLütfen pencereyi kapatmayın.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                    ),
                   ],
                 ),
-              )),
-        ],
-      ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -985,44 +930,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ],
                 ),
               )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInstructionRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInstructionRowWithCopy(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-          Row(
-            children: [
-              SelectableText(value, style: const TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: value));
-                  _showToast('Kopyalandı! 📋');
-                },
-                child: const Icon(Icons.copy_rounded, color: Color(0xFF6366F1), size: 14),
-              ),
-            ],
-          ),
         ],
       ),
     );

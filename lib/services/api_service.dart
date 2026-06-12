@@ -306,6 +306,17 @@ class ApiService {
     return res.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+  }) async {
+    final res = await _dio.post('/wallet/google-play', data: {
+      'product_id': productId,
+      'purchase_token': purchaseToken,
+    });
+    return res.data as Map<String, dynamic>;
+  }
+
   // ─── Call ─────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> initiateCall(int userId) async {

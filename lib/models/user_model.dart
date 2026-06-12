@@ -188,20 +188,35 @@ class UserModel {
     );
   }
 
+  String? get formattedAvatarUrl {
+    if (avatarUrl == null || avatarUrl!.isEmpty) return null;
+    if (avatarUrl!.startsWith('http://') || avatarUrl!.startsWith('https://')) {
+      return avatarUrl;
+    }
+    // Prepend S3 base URL for relative paths
+    final cleanPath = avatarUrl!.startsWith('/') ? avatarUrl!.substring(1) : avatarUrl!;
+    return 'https://kiraclubs-media.s3.amazonaws.com/$cleanPath';
+  }
+
   String? get firstPhotoUrl {
     for (var m in media) {
       if (m.type == 'photo' || m.type == 'image') {
         if (m.url.trim().isEmpty) continue;
         final url = m.url.toLowerCase();
         if (!url.endsWith('.mov') && !url.endsWith('.mp4') && !url.endsWith('.avi') && !url.endsWith('.mkv') && !url.endsWith('.webm')) {
-          return m.url;
+          if (m.url.startsWith('http://') || m.url.startsWith('https://')) {
+            return m.url;
+          }
+          final cleanPath = m.url.startsWith('/') ? m.url.substring(1) : m.url;
+          return 'https://kiraclubs-media.s3.amazonaws.com/$cleanPath';
         }
       }
     }
-    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) {
-      final url = avatarUrl!.toLowerCase();
+    final avatar = formattedAvatarUrl;
+    if (avatar != null) {
+      final url = avatar.toLowerCase();
       if (!url.endsWith('.mov') && !url.endsWith('.mp4') && !url.endsWith('.avi') && !url.endsWith('.mkv') && !url.endsWith('.webm')) {
-        return avatarUrl;
+        return avatar;
       }
     }
     return null;

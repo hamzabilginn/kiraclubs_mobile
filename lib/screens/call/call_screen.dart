@@ -194,9 +194,9 @@ class _CallScreenState extends State<CallScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (_isImageUrl(widget.chatUser.avatarUrl))
+        if (_isImageUrl(widget.chatUser.formattedAvatarUrl))
           Image.network(
-            widget.chatUser.avatarUrl!,
+            widget.chatUser.formattedAvatarUrl!,
             fit: BoxFit.cover,
           )
         else
@@ -235,9 +235,9 @@ class _CallScreenState extends State<CallScreen> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_isImageUrl(widget.chatUser.avatarUrl))
+            if (_isImageUrl(widget.chatUser.formattedAvatarUrl))
               Image.network(
-                widget.chatUser.avatarUrl!,
+                widget.chatUser.formattedAvatarUrl!,
                 fit: BoxFit.cover,
               )
             else
@@ -256,11 +256,11 @@ class _CallScreenState extends State<CallScreen> {
                     border: Border.all(color: AppTheme.accentColor.withOpacity(0.3), width: 4),
                   ),
                   child: CircleAvatar(
-                    backgroundImage: _isImageUrl(widget.chatUser.avatarUrl)
-                        ? NetworkImage(widget.chatUser.avatarUrl!)
+                    backgroundImage: _isImageUrl(widget.chatUser.formattedAvatarUrl)
+                        ? NetworkImage(widget.chatUser.formattedAvatarUrl!)
                         : null,
                     radius: 70,
-                    child: !_isImageUrl(widget.chatUser.avatarUrl)
+                    child: !_isImageUrl(widget.chatUser.formattedAvatarUrl)
                         ? const Icon(Icons.person, size: 70, color: Colors.white)
                         : null,
                   ),

@@ -92,6 +92,17 @@ class _MainNavScreenState extends State<MainNavScreen> {
       avatarUrl: callerAvatar,
     );
 
+    bool isImageUrl(String? url) {
+      if (url == null || url.isEmpty) return false;
+      final lower = url.toLowerCase();
+      return !lower.endsWith('.mov') &&
+             !lower.endsWith('.mp4') &&
+             !lower.endsWith('.avi') &&
+             !lower.endsWith('.mkv') &&
+             !lower.endsWith('.webm') &&
+             !lower.endsWith('.3gp');
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -120,10 +131,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: AppTheme.cardColor,
-                    backgroundImage: callerAvatar != null && callerAvatar.isNotEmpty
-                        ? NetworkImage(callerAvatar)
+                    backgroundImage: isImageUrl(callerAvatar)
+                        ? NetworkImage(callerAvatar!)
                         : null,
-                    child: callerAvatar == null || callerAvatar.isEmpty
+                    child: !isImageUrl(callerAvatar)
                         ? const Icon(Icons.person, size: 50, color: Colors.white)
                         : null,
                   ),

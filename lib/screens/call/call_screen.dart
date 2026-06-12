@@ -42,6 +42,17 @@ class _CallScreenState extends State<CallScreen> {
     super.dispose();
   }
 
+  bool _isImageUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final lower = url.toLowerCase();
+    return !lower.endsWith('.mov') &&
+           !lower.endsWith('.mp4') &&
+           !lower.endsWith('.avi') &&
+           !lower.endsWith('.mkv') &&
+           !lower.endsWith('.webm') &&
+           !lower.endsWith('.3gp');
+  }
+
   // Simulate call connection after 3 seconds of ringing
   void _startRingSimulation() {
     _ringTimer = Timer(const Duration(seconds: 3), () {
@@ -183,7 +194,7 @@ class _CallScreenState extends State<CallScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (widget.chatUser.avatarUrl != null)
+        if (_isImageUrl(widget.chatUser.avatarUrl))
           Image.network(
             widget.chatUser.avatarUrl!,
             fit: BoxFit.cover,
@@ -224,8 +235,7 @@ class _CallScreenState extends State<CallScreen> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // Blurred background image
-            if (widget.chatUser.avatarUrl != null)
+            if (_isImageUrl(widget.chatUser.avatarUrl))
               Image.network(
                 widget.chatUser.avatarUrl!,
                 fit: BoxFit.cover,
@@ -246,11 +256,11 @@ class _CallScreenState extends State<CallScreen> {
                     border: Border.all(color: AppTheme.accentColor.withOpacity(0.3), width: 4),
                   ),
                   child: CircleAvatar(
-                    backgroundImage: widget.chatUser.avatarUrl != null
+                    backgroundImage: _isImageUrl(widget.chatUser.avatarUrl)
                         ? NetworkImage(widget.chatUser.avatarUrl!)
                         : null,
                     radius: 70,
-                    child: widget.chatUser.avatarUrl == null
+                    child: !_isImageUrl(widget.chatUser.avatarUrl)
                         ? const Icon(Icons.person, size: 70, color: Colors.white)
                         : null,
                   ),

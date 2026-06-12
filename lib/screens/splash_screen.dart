@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../config/theme.dart';
 import 'auth/login_screen.dart';
 import 'home/main_nav_screen.dart';
+import '../services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -61,6 +62,12 @@ class _SplashScreenState extends State<SplashScreen>
     );
     print("SPLASH_SCREEN: Navigating to ${auth.isAuthenticated ? 'MainNavScreen' : 'LoginScreen'}...");
     Navigator.of(context).pushReplacement(route);
+
+    if (auth.isAuthenticated) {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        NotificationService.handlePendingNotification();
+      });
+    }
   }
 
   @override

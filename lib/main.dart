@@ -1,26 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'config/theme.dart';
 import 'config/constants.dart';
 import 'providers/auth_provider.dart';
 import 'screens/splash_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   print("APP START: main() starting...");
   WidgetsFlutterBinding.ensureInitialized();
   print("APP START: WidgetsFlutterBinding initialized");
 
-  // Initialize OneSignal
-  try {
-    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-    OneSignal.initialize(AppConstants.oneSignalAppId);
-    OneSignal.Notifications.requestPermission(true);
-    print("APP START: OneSignal initialized");
-  } catch (e) {
-    print("APP START: OneSignal initialization error: $e");
-  }
+  // Initialize OneSignal via NotificationService
+  NotificationService.init();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -49,6 +42,7 @@ class KiraClubsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: NotificationService.navigatorKey,
       title: 'KiraClubs',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,

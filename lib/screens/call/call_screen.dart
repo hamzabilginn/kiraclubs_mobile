@@ -65,7 +65,9 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _initAgora() async {
     // Request camera and microphone permissions
-    await [Permission.microphone, Permission.camera].request();
+    final statuses = await [Permission.microphone, Permission.camera].request();
+    debugPrint('CallScreen: Microphone permission status: ${statuses[Permission.microphone]}');
+    debugPrint('CallScreen: Camera permission status: ${statuses[Permission.camera]}');
 
     try {
       final callInfo = await _apiService.initiateCall(widget.chatUser.id);
@@ -81,16 +83,19 @@ class _CallScreenState extends State<CallScreen> {
       _engine!.registerEventHandler(
         RtcEngineEventHandler(
           onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+            debugPrint("CallScreen: local user joined success");
             setState(() {
               _localUserJoined = true;
             });
           },
           onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+            debugPrint("CallScreen: remote user joined: $remoteUid");
             setState(() {
               _remoteUid = remoteUid;
             });
           },
           onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+            debugPrint("CallScreen: remote user offline: $remoteUid");
             setState(() {
               _remoteUid = null;
             });
@@ -100,7 +105,9 @@ class _CallScreenState extends State<CallScreen> {
       );
 
       await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await _engine!.enableAudio();
       await _engine!.enableVideo();
+      await _engine!.setDefaultAudioRouteToSpeakerphone(true);
       await _engine!.startPreview();
 
       await _engine!.joinChannel(

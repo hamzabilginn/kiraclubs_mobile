@@ -9,6 +9,7 @@ import '../../services/api_service.dart';
 import '../../services/pusher_service.dart';
 import 'package:dio/dio.dart';
 import '../../providers/auth_provider.dart';
+import '../call/call_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel partner;
@@ -199,7 +200,14 @@ class _ChatScreenState extends State<ChatScreen> {
     actions: [
       IconButton(
         icon: Icon(Icons.videocam_rounded, color: AppTheme.primaryColor),
-        onPressed: () {/* Video call */},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CallScreen(chatUser: widget.partner),
+            ),
+          );
+        },
       ),
       const SizedBox(width: 4),
     ],

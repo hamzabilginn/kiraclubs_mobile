@@ -38,22 +38,29 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _init() async {
+    print("SPLASH_SCREEN: _init() starting...");
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    print("SPLASH_SCREEN: AuthProvider obtained, calling init()...");
     await auth.init();
+    print("SPLASH_SCREEN: AuthProvider init() completed");
 
     await Future.delayed(const Duration(milliseconds: 1800));
+    print("SPLASH_SCREEN: Delay completed, checking mounted...");
 
-    if (!mounted) return;
+    if (!mounted) {
+      print("SPLASH_SCREEN: Widget not mounted, aborting navigation");
+      return;
+    }
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) =>
-            auth.isAuthenticated ? const MainNavScreen() : const LoginScreen(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
+    final route = PageRouteBuilder(
+      pageBuilder: (_, __, ___) =>
+          auth.isAuthenticated ? const MainNavScreen() : const LoginScreen(),
+      transitionsBuilder: (_, anim, __, child) =>
+          FadeTransition(opacity: anim, child: child),
+      transitionDuration: const Duration(milliseconds: 500),
     );
+    print("SPLASH_SCREEN: Navigating to ${auth.isAuthenticated ? 'MainNavScreen' : 'LoginScreen'}...");
+    Navigator.of(context).pushReplacement(route);
   }
 
   @override

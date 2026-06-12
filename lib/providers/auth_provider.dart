@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../services/api_service.dart';
 import '../models/user_model.dart';
 import '../config/constants.dart';
@@ -24,15 +25,28 @@ class AuthProvider extends ChangeNotifier {
 
   /// Uygulama başlarken kaydedilmiş tokeni kontrol et
   Future<void> init() async {
+    print("AUTH_PROVIDER: init() starting...");
     final prefs = await SharedPreferences.getInstance();
+    print("AUTH_PROVIDER: SharedPreferences instance obtained");
     final token = prefs.getString(AppConstants.tokenKey);
+    print("AUTH_PROVIDER: Token from prefs: $token");
 
     if (token != null) {
       _token = token;
       try {
+        print("AUTH_PROVIDER: Fetching user profile...");
         _user = await _api.getMe();
+        print("AUTH_PROVIDER: User profile fetched successfully: ${_user?.name}");
         PusherService().init(token: token);
-      } catch (_) {
+        print("AUTH_PROVIDER: Pusher initialized");
+        try {
+          OneSignal.login(_user!.id.toString());
+        } catch (e) {
+          print("OneSignal login error on startup: $e");
+        }
+      } catch (e, stack) {
+        print("AUTH_PROVIDER: Error fetching user profile: $e");
+        print(stack);
         // Token geçersiz — temizle
         await _clearSession(prefs);
       }
@@ -40,6 +54,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isInitialized = true;
     notifyListeners();
+    print("AUTH_PROVIDER: init() completed");
   }
 
   Future<void> loadUser() async {
@@ -118,6 +133,11 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString(AppConstants.tokenKey, _token!);
     await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
     PusherService().init(token: _token!);
+    try {
+      OneSignal.login(_user!.id.toString());
+    } catch (e) {
+      print("OneSignal login error: $e");
+    }
     notifyListeners();
   }
 
@@ -127,6 +147,11 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.userKey);
     PusherService().disconnect();
+    try {
+      OneSignal.logout();
+    } catch (e) {
+      print("OneSignal logout error: $e");
+    }
   }
 
   void _setLoading(bool val) {

@@ -9,6 +9,9 @@ class AppConstants {
   // ─── Agora ────────────────────────────────────────────────────────────────
   static const String agoraAppId = 'YOUR_AGORA_APP_ID';
 
+  // ─── OneSignal ────────────────────────────────────────────────────────────
+  static const String oneSignalAppId = 'YOUR_ONESIGNAL_APP_ID';
+
   // ─── Google Play Product IDs ──────────────────────────────────────────────
   static const List<String> tokenProducts = [
     'tokens_100',

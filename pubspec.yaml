@@ -54,6 +54,7 @@ dependencies:
   # In-App Purchase
   in_app_purchase: ^3.2.0
   dart_pusher_channels: ^1.3.1
+  onesignal_flutter: ^5.2.4
 
 dev_dependencies:
   flutter_test:

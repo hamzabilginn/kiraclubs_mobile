@@ -332,6 +332,11 @@ class ApiService {
     return res.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> sendHeartbeat(int userId) async {
+    final res = await _dio.post('/call/$userId/heartbeat');
+    return res.data as Map<String, dynamic>;
+  }
+
   // ─── Statuses ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getStatuses({int page = 1}) async {

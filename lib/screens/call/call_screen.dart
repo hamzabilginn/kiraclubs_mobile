@@ -23,9 +23,15 @@ class _CallScreenState extends State<CallScreen> {
   int? _remoteUid;
   bool _isMuted = false;
   bool _isCameraOff = false;
+  bool _isSpeakerphoneOn = true;
   bool _isRinging = true;
   Timer? _ringTimer;
   String? _channelName;
+
+  // Call duration and heartbeat sync timers
+  int _callDuration = 0;
+  Timer? _durationTimer;
+  Timer? _heartbeatTimer;
 
   @override
   void initState() {
@@ -38,6 +44,8 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     CallScreen.isActive = false;
     _ringTimer?.cancel();
+    _durationTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _destroyAgora();
     super.dispose();
   }
@@ -69,15 +77,21 @@ class _CallScreenState extends State<CallScreen> {
     debugPrint('CallScreen: Microphone permission status: ${statuses[Permission.microphone]}');
     debugPrint('CallScreen: Camera permission status: ${statuses[Permission.camera]}');
 
+    if (statuses[Permission.microphone] != PermissionStatus.granted ||
+        statuses[Permission.camera] != PermissionStatus.granted) {
+      debugPrint('CallScreen WARNING: Microphone or Camera permission not granted!');
+    }
+
     try {
       final callInfo = await _apiService.initiateCall(widget.chatUser.id);
       _channelName = callInfo['channel_name'];
+      debugPrint('CallScreen: Initiate call info received. Channel: $_channelName');
       
       // Create Agora engine instance
       _engine = createAgoraRtcEngine();
       await _engine!.initialize(RtcEngineContext(
         appId: callInfo['app_id'],
-        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
       ));
 
       _engine!.registerEventHandler(
@@ -87,6 +101,13 @@ class _CallScreenState extends State<CallScreen> {
             setState(() {
               _localUserJoined = true;
             });
+            // Force audio route to speakerphone upon joining successfully
+            _engine?.setEnableSpeakerphone(true).then((_) {
+              debugPrint("CallScreen: setEnableSpeakerphone(true) completed");
+            }).catchError((err) {
+              debugPrint("CallScreen Error forcing speakerphone: $err");
+            });
+            _startCallTimers();
           },
           onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
             debugPrint("CallScreen: remote user joined: $remoteUid");
@@ -95,21 +116,27 @@ class _CallScreenState extends State<CallScreen> {
             });
           },
           onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
-            debugPrint("CallScreen: remote user offline: $remoteUid");
+            debugPrint("CallScreen: remote user offline: $remoteUid, reason: $reason");
             setState(() {
               _remoteUid = null;
             });
             _handleEndCall();
           },
+          onLocalAudioStateChanged: (connection, state, error) {
+            debugPrint("CallScreen: local audio state changed: $state, error: $error");
+          },
+          onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) {
+            debugPrint("CallScreen: remote audio state changed for user $remoteUid: $state, reason: $reason");
+          },
         ),
       );
 
-      await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await _engine!.enableAudio();
       await _engine!.enableVideo();
       await _engine!.setDefaultAudioRouteToSpeakerphone(true);
       await _engine!.startPreview();
 
+      debugPrint('CallScreen: Joining Agora channel: $_channelName');
       await _engine!.joinChannel(
         token: callInfo['agora_token'],
         channelId: _channelName!,
@@ -119,7 +146,7 @@ class _CallScreenState extends State<CallScreen> {
           publishMicrophoneTrack: true,
           autoSubscribeAudio: true,
           autoSubscribeVideo: true,
-          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          enableAudioRecordingOrPlayout: true,
         ),
       );
     } catch (e) {
@@ -139,8 +166,54 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
+  void _startCallTimers() {
+    // 1. Duration timer
+    _durationTimer?.cancel();
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _callDuration++;
+        });
+      }
+    });
+
+    // 2. Heartbeat timer
+    _heartbeatTimer?.cancel();
+    // Send initial immediate heartbeat
+    _sendHeartbeat();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _sendHeartbeat();
+    });
+  }
+
+  void _sendHeartbeat() async {
+    if (!mounted) return;
+    try {
+      final res = await _apiService.sendHeartbeat(widget.chatUser.id);
+      debugPrint("CallScreen Heartbeat success: ${res['success']}, balance: ${res['balance']}");
+      if (res['success'] == false) {
+        debugPrint("CallScreen Heartbeat termination requested by server.");
+        _handleEndCall();
+      }
+    } catch (e) {
+      debugPrint("CallScreen Error sending heartbeat: $e");
+    }
+  }
+
   void _handleEndCall() {
-    Navigator.pop(context);
+    if (_localUserJoined) {
+      _apiService.endCall(
+        widget.chatUser.id,
+        duration: _callDuration,
+        wasConnected: _localUserJoined,
+      ).catchError((err) {
+        debugPrint("CallScreen Error sending endCall API: $err");
+        return <String, dynamic>{};
+      });
+    }
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   void _toggleMute() {
@@ -155,6 +228,17 @@ class _CallScreenState extends State<CallScreen> {
       _isCameraOff = !_isCameraOff;
     });
     _engine?.muteLocalVideoStream(_isCameraOff);
+  }
+
+  void _toggleSpeakerphone() {
+    setState(() {
+      _isSpeakerphoneOn = !_isSpeakerphoneOn;
+    });
+    _engine?.setEnableSpeakerphone(_isSpeakerphoneOn).then((_) {
+      debugPrint("CallScreen: setEnableSpeakerphone($_isSpeakerphoneOn) completed");
+    }).catchError((err) {
+      debugPrint("CallScreen Error setting speakerphone: $err");
+    });
   }
 
   // Widget for local video feed
@@ -346,12 +430,15 @@ class _CallScreenState extends State<CallScreen> {
                     color: _isMuted ? Colors.black : Colors.white,
                   ),
                 ),
-                // End call
+                // Toggle speakerphone
                 FloatingActionButton(
-                  heroTag: 'end_btn',
-                  backgroundColor: Colors.red,
-                  onPressed: _handleEndCall,
-                  child: const Icon(Icons.call_end, color: Colors.white, size: 28),
+                  heroTag: 'speaker_btn',
+                  backgroundColor: _isSpeakerphoneOn ? Colors.white : Colors.white24,
+                  onPressed: _toggleSpeakerphone,
+                  child: Icon(
+                    _isSpeakerphoneOn ? Icons.volume_up : Icons.volume_down,
+                    color: _isSpeakerphoneOn ? Colors.black : Colors.white,
+                  ),
                 ),
                 // Toggle camera
                 FloatingActionButton(
@@ -362,6 +449,13 @@ class _CallScreenState extends State<CallScreen> {
                     _isCameraOff ? Icons.videocam_off : Icons.videocam,
                     color: _isCameraOff ? Colors.black : Colors.white,
                   ),
+                ),
+                // End call
+                FloatingActionButton(
+                  heroTag: 'end_btn',
+                  backgroundColor: Colors.red,
+                  onPressed: _handleEndCall,
+                  child: const Icon(Icons.call_end, color: Colors.white, size: 28),
                 ),
               ],
             ),

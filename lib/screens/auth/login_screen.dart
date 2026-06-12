@@ -123,27 +123,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ]),
               ),
-              const SizedBox(height: 28),
-              Row(children: [
-                Expanded(child: Divider(color: AppTheme.borderCol)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('veya', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                ),
-                Expanded(child: Divider(color: AppTheme.borderCol)),
-              ]),
-              const SizedBox(height: 28),
-              _SocialButton(
-                iconData: Icons.g_mobiledata_rounded,
-                label: 'Google ile devam et',
-                onTap: () {},
-              ),
-              const SizedBox(height: 12),
-              _SocialButton(
-                iconData: Icons.apple,
-                label: 'Apple ile devam et',
-                onTap: () {},
-              ),
               const SizedBox(height: 40),
               Center(
                 child: GestureDetector(

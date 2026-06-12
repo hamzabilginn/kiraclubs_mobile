@@ -7,6 +7,7 @@ import '../../models/user_model.dart';
 import '../../models/message_model.dart';
 import '../../services/api_service.dart';
 import '../../services/pusher_service.dart';
+import 'package:dio/dio.dart';
 import '../../providers/auth_provider.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -116,7 +117,23 @@ class _ChatScreenState extends State<ChatScreen> {
       final msg = await _api.sendMessage(widget.partner.id, text);
       setState(() { _messages.add(msg); _isSending = false; });
       _scrollToBottom();
-    } catch (e) { setState(() => _isSending = false); }
+    } catch (e) {
+      setState(() => _isSending = false);
+      String errMsg = 'Mesaj gönderilemedi.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errMsg = data['message'].toString();
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(errMsg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
   }
 
   void _scrollToBottom() {

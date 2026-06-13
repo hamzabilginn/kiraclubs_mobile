@@ -59,10 +59,15 @@ class ApiService {
     required String password,
     required String gender,
     required String country,
+    required String language,
   }) async {
     final res = await _dio.post('/auth/register', data: {
-      'name': name, 'email': email, 'password': password,
-      'gender': gender, 'country': country,
+      'name': name,
+      'email': email,
+      'password': password,
+      'gender': gender,
+      'country': country,
+      'language': language,
     });
     return res.data as Map<String, dynamic>;
   }

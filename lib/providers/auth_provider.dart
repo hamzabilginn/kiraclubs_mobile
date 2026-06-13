@@ -88,14 +88,19 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String gender,
     required String country,
+    required String language,
   }) async {
     _setLoading(true);
     _errorMessage = null;
 
     try {
       final data = await _api.register(
-        name: name, email: email, password: password,
-        gender: gender, country: country,
+        name: name,
+        email: email,
+        password: password,
+        gender: gender,
+        country: country,
+        language: language,
       );
       await _saveSession(data);
       _setLoading(false);

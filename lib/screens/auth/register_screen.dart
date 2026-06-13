@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,7 +21,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
   String _gender      = 'male';
-  String _country     = 'TR';
   bool _obscurePass   = true;
   int _step           = 1; // 2-step register
 
@@ -32,16 +32,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  String _detectCountry() {
+    try {
+      final locale = ui.PlatformDispatcher.instance.locale;
+      final countryCode = locale.countryCode?.toUpperCase();
+      final supportedCountries = ['TR', 'RU', 'AZ', 'KZ', 'UZ', 'DE', 'US'];
+      if (countryCode != null && supportedCountries.contains(countryCode)) {
+        return countryCode;
+      }
+      final langCode = locale.languageCode.toLowerCase();
+      final langToCountry = {
+        'tr': 'TR',
+        'ru': 'RU',
+        'az': 'AZ',
+        'kk': 'KZ',
+        'uz': 'UZ',
+        'de': 'DE',
+        'en': 'US',
+      };
+      return langToCountry[langCode] ?? 'US';
+    } catch (_) {
+      return 'US';
+    }
+  }
+
+  String _detectLanguage() {
+    try {
+      final locale = ui.PlatformDispatcher.instance.locale;
+      final langCode = locale.languageCode.toLowerCase();
+      final supportedLanguages = ['tr', 'ru', 'az', 'kz', 'uz', 'de', 'en'];
+      final mappedLang = langCode == 'kk' ? 'kz' : langCode;
+      if (supportedLanguages.contains(mappedLang)) {
+        return mappedLang;
+      }
+      return 'en';
+    } catch (_) {
+      return 'en';
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final String country = _detectCountry();
+    final String language = _detectLanguage();
+
     final ok = await auth.register(
       name:     _nameCtrl.text.trim(),
       email:    _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
       gender:   _gender,
-      country:  _country,
+      country:  country,
+      language: language,
     );
 
     if (!mounted) return;
@@ -162,37 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onTap: () => setState(() => _gender = 'female'),
                     ),
                   ]),
-                  const SizedBox(height: 24),
 
-                  // Ülke
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1B2E),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderCol, width: 1.5),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _country,
-                        isExpanded: true,
-                        dropdownColor: const Color(0xFF1E1B2E),
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF9CA3AF)),
-                        onChanged: (v) => setState(() => _country = v ?? 'TR'),
-                        items: const [
-                          DropdownMenuItem(value: 'TR', child: Text('🇹🇷 Türkiye')),
-                          DropdownMenuItem(value: 'RU', child: Text('🇷🇺 Rusya')),
-                          DropdownMenuItem(value: 'AZ', child: Text('🇦🇿 Azerbaycan')),
-                          DropdownMenuItem(value: 'KZ', child: Text('🇰🇿 Kazakistan')),
-                          DropdownMenuItem(value: 'UZ', child: Text('🇺🇿 Özbekistan')),
-                          DropdownMenuItem(value: 'DE', child: Text('🇩🇪 Almanya')),
-                          DropdownMenuItem(value: 'US', child: Text('🇺🇸 ABD')),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
 
                   GradientButton(
                     text: 'Hesap Oluştur',

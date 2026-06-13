@@ -440,7 +440,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     bool isButtonEnabled = true;
 
     if (isCurrentPackage) {
-      buttonText = 'Üst Seviye Üyelik Aktif';
+      int remainingDays = 0;
+      if (user.vipExpiresAt != null) {
+        try {
+          final expires = DateTime.parse(user.vipExpiresAt!).toLocal();
+          final now = DateTime.now();
+          remainingDays = expires.difference(now).inDays + 1;
+        } catch (_) {}
+      }
+      buttonText = remainingDays > 0 ? '$remainingDays Gün Kaldı' : 'Üst Seviye Üyelik Aktif';
       isButtonEnabled = false;
     } else if (isHigherActive) {
       buttonText = 'Zaten Üst Üyeliğe Sahipsiniz';

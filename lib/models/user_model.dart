@@ -11,8 +11,10 @@ class UserModel {
   final String? referralCode;
   final String? vipLevel;
   final bool isVip;
+  final String? vipExpiresAt;
   final bool isIncognito;
   final String? verificationStatus;
+  final int? leaderboardRank;
   final int level;
   final String rankName;
   final int levelProgress;
@@ -47,8 +49,10 @@ class UserModel {
     this.referralCode,
     this.vipLevel,
     this.isVip = false,
+    this.vipExpiresAt,
     this.isIncognito = false,
     this.verificationStatus,
+    this.leaderboardRank,
     this.level = 1,
     this.rankName = 'Bronz I',
     this.levelProgress = 0,
@@ -81,8 +85,10 @@ class UserModel {
       referralCode:       json['referral_code'] as String?,
       vipLevel:           json['vip_level'] as String?,
       isVip:              _parseBool(json['is_vip']),
+      vipExpiresAt:       json['vip_expires_at'] as String?,
       isIncognito:        _parseBool(json['is_incognito']),
       verificationStatus: json['verification_status'] as String?,
+      leaderboardRank:    json['leaderboard_rank'] as int?,
       level:              json['level'] as int? ?? 1,
       rankName:           json['rank_name'] as String? ?? 'Bronz I',
       levelProgress:      json['level_progress'] as int? ?? 0,
@@ -121,8 +127,10 @@ class UserModel {
     'referral_code':       referralCode,
     'vip_level':           vipLevel,
     'is_vip':              isVip,
+    'vip_expires_at':       vipExpiresAt,
     'is_incognito':        isIncognito,
     'verification_status': verificationStatus,
+    'leaderboard_rank':    leaderboardRank,
     'level':               level,
     'rank_name':           rankName,
     'level_progress':      levelProgress,
@@ -145,7 +153,9 @@ class UserModel {
     String? referralCode,
     String? vipLevel,
     bool? isVip,
+    String? vipExpiresAt,
     bool? isIncognito,
+    int? leaderboardRank,
     int? tokens,
     int? earnedCoins,
     List<MediaItem>? media,
@@ -165,8 +175,10 @@ class UserModel {
       referralCode:       referralCode ?? this.referralCode,
       vipLevel:           vipLevel ?? this.vipLevel,
       isVip:              isVip ?? this.isVip,
+      vipExpiresAt:       vipExpiresAt ?? this.vipExpiresAt,
       isIncognito:        isIncognito ?? this.isIncognito,
       verificationStatus: verificationStatus,
+      leaderboardRank:    leaderboardRank ?? this.leaderboardRank,
       level:              level,
       rankName:           rankName,
       levelProgress:      levelProgress,

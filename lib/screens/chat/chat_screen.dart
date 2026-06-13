@@ -563,21 +563,131 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendDirectMessage(String text) async {
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    try {
+      final msg = await _api.sendMessage(widget.partner.id, text);
+      setState(() { _messages.add(msg); _isSending = false; });
+      _scrollToBottom();
+    } catch (e) {
+      setState(() => _isSending = false);
+      String errMsg = 'Mesaj gönderilemedi.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errMsg = data['message'].toString();
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(errMsg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  Widget _quickSuggestionsBar() {
+    const suggestions = [
+      'Harika gözlerin var! ✨',
+      'Selam, bugün nasılsın? 🌹',
+      'Hadi görüntülü konuşalım! 📹',
+      'Sana güzel bir hediye göndermek istiyorum... 🎁',
+    ];
+    return Container(
+      height: 44,
+      color: const Color(0xFF0F0D1A),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        itemCount: suggestions.length,
+        itemBuilder: (context, index) {
+          final text = suggestions[index];
+          return GestureDetector(
+            onTap: () => _sendDirectMessage(text),
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: Center(
+                child: Text(
+                  text,
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _verifiedBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1D3557).withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF457B9D).withOpacity(0.4), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF3B82F6),
+            size: 36,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Bu kullanıcı, kimlik bilgileri doğrulanmış onaylı bir üyedir.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.blue.shade100,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppTheme.backgroundColor,
-    appBar: _appBar(),
-    body: Column(children: [
-      Expanded(child: _isLoading ? const Center(child: CircularProgressIndicator())
-        : ListView.builder(
-          controller: _scrollCtrl,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          itemCount: _messages.length,
-          itemBuilder: (_, i) => _bubble(_messages[i]),
-        )),
-      _isRecording ? _recordingInputBar() : _normalInputBar(),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final bool isPartnerVerified = widget.partner.verificationStatus == 'verified';
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: _appBar(),
+      body: Column(children: [
+        Expanded(child: _isLoading ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              itemCount: _messages.length + (isPartnerVerified ? 1 : 0),
+              itemBuilder: (_, i) {
+                if (isPartnerVerified) {
+                  if (i == 0) {
+                    return _verifiedBanner();
+                  }
+                  return _bubble(_messages[i - 1]);
+                }
+                return _bubble(_messages[i]);
+              },
+            )),
+        if (!_isRecording) _quickSuggestionsBar(),
+        _isRecording ? _recordingInputBar() : _normalInputBar(),
+      ]),
+    );
+  }
 
   PreferredSizeWidget _appBar() => AppBar(
     backgroundColor: const Color(0xFF0F0D1A),
@@ -850,79 +960,114 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }  Widget _normalInputBar() {
     final showSend = _msgCtrl.text.trim().isNotEmpty || _isSending;
+    final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
+    
+    String hintText = 'Mesajını yaz...';
+    if (currentUser != null) {
+      if (currentUser.gender == 'female') {
+        hintText = 'Mesajını yaz... (Ücretsiz!)';
+      } else {
+        final isVipGoldOrPlat = (currentUser.vipLevel == 'gold' || currentUser.vipLevel == 'platinum') && currentUser.isVip;
+        if (isVipGoldOrPlat) {
+          hintText = 'Mesajını yaz... (Ücretsiz!)';
+        } else {
+          hintText = 'Mesajını yaz... (15 Kredi)';
+        }
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0F0D1A),
         border: Border(top: BorderSide(color: AppTheme.borderCol, width: 0.5)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       child: SafeArea(
         child: Row(
           children: [
-            Expanded(
+            GestureDetector(
+              onTap: _showAttachmentOptions,
               child: Container(
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: AppTheme.cardColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppTheme.borderCol),
+                  color: const Color(0xFF8B5CF6),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(Icons.card_giftcard_rounded, color: Colors.pink.shade400, size: 22),
-                      onPressed: _showGiftSheet,
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _msgCtrl,
-                        onChanged: (text) {
-                          setState(() {});
-                        },
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
-                        maxLines: 4,
-                        minLines: 1,
-                        decoration: InputDecoration.collapsed(
-                          hintText: 'Mesaj yaz...',
-                          hintStyle: TextStyle(color: AppTheme.textSecondary),
-                        ),
-                        onSubmitted: (_) => _send(),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.attach_file_rounded, color: AppTheme.textSecondary),
-                      onPressed: _showAttachmentOptions,
-                    ),
-                  ],
+                child: const Icon(Icons.image_outlined, color: Colors.white, size: 20),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: _showGiftSheet,
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEC4899),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: _startRecording,
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.mic_none_outlined, color: Colors.white, size: 20),
               ),
             ),
             const SizedBox(width: 10),
-            GestureDetector(
-              onTap: showSend ? _send : _startRecording,
+            Expanded(
               child: Container(
-                width: 48,
-                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  gradient: showSend ? AppTheme.primaryGradient : null,
-                  color: showSend ? null : const Color(0xFF1E1B30),
-                  shape: BoxShape.circle,
-                  border: showSend ? null : Border.all(color: AppTheme.borderCol),
-                  boxShadow: showSend
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
-                      : null,
+                  color: const Color(0xFF161426),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
-                child: Icon(
-                  showSend ? Icons.send_rounded : Icons.mic_rounded,
-                  color: showSend ? Colors.white : Colors.white70,
-                  size: 20,
+                child: TextField(
+                  controller: _msgCtrl,
+                  onChanged: (text) {
+                    setState(() {});
+                  },
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  maxLines: 4,
+                  minLines: 1,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: hintText,
+                    hintStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onSubmitted: (_) => _send(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: showSend ? _send : null,
+              child: Opacity(
+                opacity: showSend ? 1.0 : 0.4,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF6366F1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.send_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ),

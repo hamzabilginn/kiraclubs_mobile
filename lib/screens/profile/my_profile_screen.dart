@@ -206,6 +206,70 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
     }
   }
 
+  Widget _buildLeaderboardRankBadge(int? rank) {
+    if (rank == null) return const SizedBox.shrink();
+
+    Gradient? grad;
+    Color borderCol = Colors.transparent;
+    String label = '';
+    List<BoxShadow> shadow = [];
+
+    if (rank <= 10) {
+      label = '👑 #$rank';
+      grad = const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF8B5CF6)]);
+      borderCol = const Color(0xFFFBBF24).withOpacity(0.5);
+      shadow = [
+        BoxShadow(
+          color: const Color(0xFFF59E0B).withOpacity(0.4),
+          blurRadius: 10,
+          spreadRadius: 1,
+        )
+      ];
+    } else if (rank <= 50) {
+      label = '🏆 #$rank';
+      grad = const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF2563EB)]);
+      borderCol = const Color(0xFF22D3EE).withOpacity(0.3);
+      shadow = [
+        BoxShadow(
+          color: const Color(0xFF22D3EE).withOpacity(0.2),
+          blurRadius: 8,
+        )
+      ];
+    } else if (rank <= 100) {
+      label = '✨ #$rank';
+      grad = const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]);
+      borderCol = const Color(0xFF6366F1).withOpacity(0.2);
+    } else {
+      label = '#$rank';
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: grad,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderCol, width: 1),
+        boxShadow: shadow,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -313,9 +377,18 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Colors.white54),
           label: const Text('Keşfet\'e Dön', style: TextStyle(color: Colors.white54, fontSize: 13)),
         ),
-        title: Text(
-          user.name,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              user.name,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (user.leaderboardRank != null) ...[
+              const SizedBox(width: 6),
+              _buildLeaderboardRankBadge(user.leaderboardRank),
+            ],
+          ],
         ),
         actions: [
           if (_tabController.index == 0)

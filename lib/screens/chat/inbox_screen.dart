@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/message_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
 import 'chat_screen.dart';
 import '../profile/public_profile_screen.dart';
 import '../profile/likers_screen.dart';
@@ -97,40 +99,171 @@ class _InboxScreenState extends State<InboxScreen>
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppTheme.backgroundColor,
-    body: SafeArea(child: Column(children: [
-      _header(),
-      _tabBar(),
-      Expanded(child: TabBarView(
-        controller: _tabController,
-        children: [
-          _messagesTab(),
-          _callsTab(),
-          _likersTab(),
-          _visitorsTab(),
-        ],
-      )),
-    ])),
-  );
+  void _showMassMessageDialog() {
+    final TextEditingController msgCtrl = TextEditingController();
+    bool isSendingMass = false;
 
-  Widget _header() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-    child: Row(children: [
-      const Text('Aktivite',
-        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-      const Spacer(),
-      Container(
-        decoration: BoxDecoration(color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.borderCol)),
-        child: IconButton(
-          icon: Icon(Icons.edit_outlined, color: AppTheme.textSecondary),
-          onPressed: () {},
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF161426),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.campaign_rounded, color: Color(0xFFEC4899), size: 24),
+              SizedBox(width: 10),
+              Text(
+                'Toplu Mesaj Gönder',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Yazacağınız mesaj sistemdeki tüm erkek üyelere toplu olarak gönderilecektir.',
+                style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0D1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: TextField(
+                  controller: msgCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  maxLines: 4,
+                  minLines: 2,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'Mesajınızı yazın...',
+                    hintStyle: TextStyle(color: Colors.white30, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('İptal', style: TextStyle(color: Colors.white60)),
+              onPressed: () => Navigator.pop(dialogCtx),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEC4899),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isSendingMass
+                  ? null
+                  : () async {
+                      final txt = msgCtrl.text.trim();
+                      if (txt.isEmpty) return;
+
+                      setDialogState(() => isSendingMass = true);
+                      try {
+                        final res = await _api.sendMassMessage(txt);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(res['message'] ?? 'Toplu mesaj başarıyla gönderildi!'),
+                            backgroundColor: Colors.green,
+                          ));
+                        }
+                        Navigator.pop(dialogCtx);
+                      } catch (e) {
+                        setDialogState(() => isSendingMass = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Hata: $e'),
+                            backgroundColor: Colors.red,
+                          ));
+                        }
+                      }
+                    },
+              child: isSendingMass
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Gönder'),
+            ),
+          ],
         ),
       ),
-    ]),
-  );
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = Provider.of<AuthProvider>(context).user;
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(child: Column(children: [
+        _header(currentUser),
+        _tabBar(),
+        Expanded(child: TabBarView(
+          controller: _tabController,
+          children: [
+            _messagesTab(),
+            _callsTab(),
+            _likersTab(),
+            _visitorsTab(),
+          ],
+        )),
+      ])),
+    );
+  }
+
+  Widget _header(UserModel? currentUser) {
+    final bool isFemale = currentUser?.gender == 'female';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(children: [
+        const Text('Aktivite',
+          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        const Spacer(),
+        if (isFemale) ...[
+          GestureDetector(
+            onTap: _showMassMessageDialog,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFEC4899).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))
+                ],
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.campaign_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Toplu Mesaj',
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Container(
+          decoration: BoxDecoration(color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.borderCol)),
+          child: IconButton(
+            icon: Icon(Icons.edit_outlined, color: AppTheme.textSecondary),
+            onPressed: () {},
+          ),
+        ),
+      ]),
+    );
+  }
 
   Widget _tabBar() => Container(
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

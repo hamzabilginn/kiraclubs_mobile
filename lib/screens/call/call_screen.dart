@@ -97,10 +97,11 @@ class _CallScreenState extends State<CallScreen> {
         areaCode: AreaCode.areaCodeEu.value(), // European servers for lowest latency in Turkey/Europe
       ));
 
-      // Optimize audio scenario for low latency and high quality speech
+      // Use Music Standard profile to force a 48kHz sample rate. This matches standard WebRTC expectations
+      // on iOS Safari and prevents the audio resampling bug that causes metallic buzzing.
       await _engine!.setAudioProfile(
-        profile: AudioProfileType.audioProfileSpeechStandard,
-        scenario: AudioScenarioType.audioScenarioGameStreaming,
+        profile: AudioProfileType.audioProfileMusicStandard,
+        scenario: AudioScenarioType.audioScenarioDefault,
       );
 
       _engine!.registerEventHandler(

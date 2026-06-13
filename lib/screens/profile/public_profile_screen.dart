@@ -784,6 +784,109 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     );
   }
 
+  void _confirmBlock() {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF161426),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.block_rounded, color: Colors.redAccent, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Kullanıcıyı Engelle',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Bu kullanıcıyı engellemek istediğinize emin misiniz? Engellenen kullanıcılar size mesaj gönderemez ve sizi arayamaz.',
+          style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('İptal', style: TextStyle(color: Colors.white60)),
+            onPressed: () => Navigator.pop(dialogCtx),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Engelle'),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              if (_user != null) {
+                try {
+                  await _api.blockUser(_user!.id);
+                  _showToast('Kullanıcı başarıyla engellendi.');
+                  if (mounted) Navigator.pop(context); // Close profile screen
+                } catch (e) {
+                  _showToast('Kullanıcı engellenemedi.');
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportDialog() {
+    final reasons = [
+      'Spam veya Şüpheli Hesap',
+      'Uygunsuz Fotoğraf / Video',
+      'Taciz / Rahatsız Etme',
+      'Sahte Profil / Başkası Gibi Davranma',
+      'Diğer Nedenler'
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF161426),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.flag_outlined, color: Colors.amber, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Kullanıcıyı Şikayet Et',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: reasons.length,
+            itemBuilder: (context, index) {
+              final reason = reasons[index];
+              return ListTile(
+                title: Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
+                onTap: () async {
+                  Navigator.pop(dialogCtx);
+                  if (_user != null) {
+                    try {
+                      await _api.reportUser(_user!.id, reason);
+                      _showToast('Şikayetiniz iletildi. Teşekkür ederiz.');
+                    } catch (e) {
+                      _showToast('Şikayet iletilemedi.');
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showOptions() {
     showModalBottomSheet(
       context: context,
@@ -802,17 +905,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               ListTile(
                   leading: const Icon(Icons.block_rounded, color: Colors.red),
                   title: const Text('Engelle', style: TextStyle(color: Colors.red)),
-                  onTap: () async {
+                  onTap: () {
                     Navigator.pop(context);
-                    if (_user != null) await _api.blockUser(_user!.id);
-                    if (mounted) Navigator.pop(context);
+                    _confirmBlock();
                   }),
               ListTile(
                   leading: const Icon(Icons.flag_outlined, color: Colors.black54),
                   title: const Text('Şikayet Et', style: TextStyle(color: Colors.black87)),
                   onTap: () {
                     Navigator.pop(context);
-                    if (_user != null) _api.reportUser(_user!.id, 'Uygunsuz içerik');
+                    _showReportDialog();
                   }),
               const SizedBox(height: 16),
             ],

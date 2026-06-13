@@ -138,12 +138,26 @@ class _CallScreenState extends State<CallScreen> {
           onRemoteAudioStateChanged: (connection, remoteUid, state, reason, elapsed) {
             debugPrint("CallScreen: remote audio state changed for user $remoteUid: $state, reason: $reason");
           },
+          onAudioVolumeIndication: (connection, speakers, speakerNumber, totalVolume) {
+            for (var speaker in speakers) {
+              if (speaker.uid == 0) {
+                debugPrint("CallScreen Diagnostic -> Local Microphone Volume: ${speaker.volume} (0=silent/broken)");
+              } else {
+                debugPrint("CallScreen Diagnostic -> Remote User ${speaker.uid} Volume: ${speaker.volume}");
+              }
+            }
+          },
         ),
       );
 
       await _engine!.enableAudio();
       await _engine!.enableVideo();
       await _engine!.setDefaultAudioRouteToSpeakerphone(true);
+      await _engine!.enableAudioVolumeIndication(
+        interval: 1000,
+        smooth: 3,
+        reportVad: true,
+      );
       await _engine!.startPreview();
 
       debugPrint('CallScreen: Joining Agora channel: $_channelName');

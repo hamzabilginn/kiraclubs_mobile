@@ -601,8 +601,24 @@ class _ChatScreenState extends State<ChatScreen> {
       ]),
       const SizedBox(width: 12),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(widget.partner.name,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.partner.name,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            if (widget.partner.isVip) ...[
+              const SizedBox(width: 4),
+              Text(
+                widget.partner.vipLevel == 'platinum' ? '💜' : widget.partner.vipLevel == 'gold' ? '⭐' : '🥈',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
+            if (widget.partner.verificationStatus == 'verified') ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.verified, color: Colors.blue, size: 16),
+            ],
+          ],
+        ),
         Text(
           widget.partner.isOnline
               ? 'Çevrimiçi'

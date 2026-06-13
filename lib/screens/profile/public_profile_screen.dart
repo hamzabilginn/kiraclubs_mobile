@@ -842,46 +842,128 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       'Sahte Profil / Başkası Gibi Davranma',
       'Diğer Nedenler'
     ];
+    String selectedReason = reasons.first;
+    final descCtrl = TextEditingController();
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF161426),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.flag_outlined, color: Colors.amber, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'Kullanıcıyı Şikayet Et',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF161426),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.flag_outlined, color: Colors.amber, size: 24),
+              SizedBox(width: 10),
+              Text(
+                'Kullanıcıyı Şikayet Et',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Şikayet Nedeni',
+                style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0D1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButtonFormField<String>(
+                    dropdownColor: const Color(0xFF161426),
+                    value: selectedReason,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    items: reasons
+                        .map((r) => DropdownMenuItem(
+                              value: r,
+                              child: Text(r),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedReason = val);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Açıklama / Detaylar',
+                style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0D1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: TextField(
+                  controller: descCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  maxLines: 4,
+                  minLines: 2,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'Şikayetinizi detaylandırın...',
+                    hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('İptal', style: TextStyle(color: Colors.white60)),
+              onPressed: () => Navigator.pop(dialogCtx),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        if (_user != null) {
+                          await _api.reportUser(
+                            _user!.id,
+                            selectedReason,
+                            description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
+                          );
+                          _showToast('Şikayetiniz iletildi. Teşekkür ederiz.');
+                        }
+                        Navigator.pop(dialogCtx);
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        _showToast('Şikayet iletilemedi.');
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Gönder'),
             ),
           ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: reasons.length,
-            itemBuilder: (context, index) {
-              final reason = reasons[index];
-              return ListTile(
-                title: Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
-                onTap: () async {
-                  Navigator.pop(dialogCtx);
-                  if (_user != null) {
-                    try {
-                      await _api.reportUser(_user!.id, reason);
-                      _showToast('Şikayetiniz iletildi. Teşekkür ederiz.');
-                    } catch (e) {
-                      _showToast('Şikayet iletilemedi.');
-                    }
-                  }
-                },
-              );
-            },
-          ),
         ),
       ),
     );

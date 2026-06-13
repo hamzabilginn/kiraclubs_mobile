@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
 import '../../models/message_model.dart';
 import '../../models/user_model.dart';
@@ -29,6 +30,7 @@ class _InboxScreenState extends State<InboxScreen>
   // Messages
   List<ConversationModel> _conversations = [];
   bool _loadingMessages = true;
+  List<int> _pinnedUserIds = [];
 
   // Calls
   List<CallLogItem> _calls = [];
@@ -54,7 +56,18 @@ class _InboxScreenState extends State<InboxScreen>
         case 3: _loadVisitors(); break;
       }
     });
+    _loadPinnedUserIds();
     _loadMessages();
+  }
+
+  Future<void> _loadPinnedUserIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('pinned_conversations') ?? [];
+      setState(() {
+        _pinnedUserIds = list.map((id) => int.parse(id)).toList();
+      });
+    } catch (_) {}
   }
 
   @override
@@ -292,25 +305,80 @@ class _InboxScreenState extends State<InboxScreen>
 
   // ─── Messages Tab ───────────────────────────────────────────────────────────
 
-  Widget _messagesTab() => _loadingMessages
-    ? _shimmerList()
-    : _conversations.isEmpty
-      ? _empty('Henüz mesajın yok', "Keşfet'ten birileriyle tanış! 💜", Icons.chat_bubble_outline_rounded)
-      : RefreshIndicator(
-          onRefresh: _loadMessages,
-          color: AppTheme.primaryColor,
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 20),
-            itemCount: _conversations.length,
-            itemBuilder: (_, i) => _conversationTile(_conversations[i])));
+  Widget _messagesTab() {
+    if (_loadingMessages) return _shimmerList();
+    if (_conversations.isEmpty) {
+      return _empty('Henüz mesajın yok', "Keşfet'ten birileriyle tanış! 💜", Icons.chat_bubble_outline_rounded);
+    }
+
+    final sortedConversations = List<ConversationModel>.from(_conversations);
+    sortedConversations.sort((a, b) {
+      final aPinned = _pinnedUserIds.contains(a.partner.id);
+      final bPinned = _pinnedUserIds.contains(b.partner.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+
+    return RefreshIndicator(
+        onRefresh: _loadMessages,
+        color: AppTheme.primaryColor,
+        child: ListView.builder(
+          padding: const EdgeInsets.only(top: 8, bottom: 20),
+          itemCount: sortedConversations.length,
+          itemBuilder: (_, i) => _conversationTile(sortedConversations[i])));
+  }
+
+  void _showConversationOptions(ConversationModel conv) {
+    final bool isPinned = _pinnedUserIds.contains(conv.partner.id);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F0D1A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(
+                isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                color: isPinned ? Colors.amber : Colors.white60,
+              ),
+              title: Text(
+                isPinned ? 'Sohbetin Sabitlemesini Kaldır' : 'Sohbeti Sabitle',
+                style: const TextStyle(color: Colors.white),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                final prefs = await SharedPreferences.getInstance();
+                setState(() {
+                  if (isPinned) {
+                    _pinnedUserIds.remove(conv.partner.id);
+                  } else {
+                    _pinnedUserIds.add(conv.partner.id);
+                  }
+                });
+                await prefs.setStringList(
+                  'pinned_conversations',
+                  _pinnedUserIds.map((id) => id.toString()).toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _conversationTile(ConversationModel conv) {
     final p = conv.partner;
     final m = conv.lastMessage;
     final hasUnread = conv.unreadCount > 0;
+    final isPinned = _pinnedUserIds.contains(p.id);
+
     return GestureDetector(
       onTap: () => Navigator.push(context,
         MaterialPageRoute(builder: (_) => ChatScreen(partner: p))).then((_) => _loadMessages()),
+      onLongPress: () => _showConversationOptions(conv),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         padding: const EdgeInsets.all(14),
@@ -330,8 +398,20 @@ class _InboxScreenState extends State<InboxScreen>
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(p.name, style: TextStyle(color: Colors.white, fontSize: 16,
-                fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal))),
+              Expanded(child: Row(
+                children: [
+                  Flexible(
+                    child: Text(p.name, 
+                      style: TextStyle(color: Colors.white, fontSize: 16,
+                        fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal),
+                      overflow: TextOverflow.ellipsis),
+                  ),
+                  if (isPinned) ...[
+                    const SizedBox(width: 6),
+                    const Icon(Icons.push_pin_rounded, color: Colors.amber, size: 14),
+                  ]
+                ],
+              )),
               if (m != null) Text(_timeAgo(m.createdAt), style: TextStyle(
                 color: hasUnread ? AppTheme.primaryColor : AppTheme.textSecondary, fontSize: 12)),
             ]),

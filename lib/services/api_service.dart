@@ -246,8 +246,11 @@ class ApiService {
     await _dio.post('/user/$userId/block');
   }
 
-  Future<void> reportUser(int userId, String reason) async {
-    await _dio.post('/user/$userId/report', data: {'reason': reason});
+  Future<void> reportUser(int userId, String reason, {String? description}) async {
+    await _dio.post('/user/$userId/report', data: {
+      'reason': reason,
+      if (description != null) 'description': description,
+    });
   }
 
   Future<List<Map<String, dynamic>>> getLeaderboard() async {

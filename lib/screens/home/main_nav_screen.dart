@@ -49,9 +49,55 @@ class _MainNavScreenState extends State<MainNavScreen> {
             _dismissIncomingCallDialog();
             _dismissActiveCall();
           }
+        } else if (event.eventName == 'NotificationReceived') {
+          _showInAppNotification(event.data);
         }
       });
     }
+  }
+
+  void _showInAppNotification(dynamic data) {
+    if (data == null || !mounted) return;
+
+    final String type = data['type'] ?? '';
+    final String senderName = data['sender_name'] ?? 'Biri';
+
+    String message = '';
+    if (type == 'visit') {
+      message = '$senderName profilinize baktı 👀';
+    } else if (type == 'follow') {
+      message = '$senderName sizi takip etmeye başladı 🌹';
+    } else if (type == 'like_photo') {
+      message = '$senderName fotoğrafınızı beğendi ❤️';
+    } else if (type == 'like_status') {
+      message = '$senderName paylaştığınız durumu beğendi 👍';
+    } else if (type == 'like_profile') {
+      message = '$senderName profilinizi beğendi ❤️';
+    }
+
+    if (message.isEmpty) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.notifications_active, color: Colors.amber, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E1B2E),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _unsubscribeFromIncomingCalls() {

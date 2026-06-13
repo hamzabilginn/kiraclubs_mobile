@@ -60,19 +60,18 @@ class _MainNavScreenState extends State<MainNavScreen> {
     if (data == null || !mounted) return;
 
     final String type = data['type'] ?? '';
-    final String senderName = data['sender_name'] ?? 'Biri';
 
     String message = '';
     if (type == 'visit') {
-      message = '$senderName profilinize baktı 👀';
+      message = 'Biri profilinize baktı 👀 Hemen kontrol et!';
     } else if (type == 'follow') {
-      message = '$senderName sizi takip etmeye başladı 🌹';
+      message = 'Yeni bir takipçi kazandın! 🌹 Hemen kontrol et!';
     } else if (type == 'like_photo') {
-      message = '$senderName fotoğrafınızı beğendi ❤️';
+      message = 'Biri fotoğrafınızı beğendi ❤️ Hemen kontrol et!';
     } else if (type == 'like_status') {
-      message = '$senderName paylaştığınız durumu beğendi 👍';
+      message = 'Biri paylaştığınız durumu beğendi 👍 Hemen kontrol et!';
     } else if (type == 'like_profile') {
-      message = '$senderName profilinizi beğendi ❤️';
+      message = 'Biri profilinizi beğendi ❤️ Hemen kontrol et!';
     }
 
     if (message.isEmpty) return;

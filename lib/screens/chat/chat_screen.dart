@@ -1,13 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../models/user_model.dart';
 import '../../models/message_model.dart';
 import '../../services/api_service.dart';
 import '../../services/pusher_service.dart';
-import 'package:dio/dio.dart';
 import '../../providers/auth_provider.dart';
 import '../call/call_screen.dart';
 
@@ -29,6 +36,13 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   String? _pusherChannel;
 
+  // Recording variables
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
+  String? _recordingPath;
+  int _recordDuration = 0;
+  Timer? _recordTimer;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +57,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
+    _audioRecorder.dispose();
+    _recordTimer?.cancel();
     super.dispose();
   }
 
@@ -146,6 +162,407 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // ─── Image Uploading ───────────────────────────────────────────────────────
+
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() => _isSending = true);
+
+      final msg = await _api.uploadChatImage(widget.partner.id, pickedFile.path);
+
+      setState(() {
+        _messages.add(msg);
+        _isSending = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      setState(() => _isSending = false);
+      String errMsg = 'Fotoğraf gönderilemedi.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errMsg = data['message'].toString();
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(errMsg),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F0D1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
+              title: const Text('Galeri', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndSendImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
+              title: const Text('Kamera', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndSendImage(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Voice Messages ────────────────────────────────────────────────────────
+
+  Future<void> _startRecording() async {
+    try {
+      final hasMicPermission = await Permission.microphone.request();
+      if (hasMicPermission != PermissionStatus.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Mikrofon izni verilmedi.'),
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+
+      setState(() {
+        _isRecording = true;
+        _recordDuration = 0;
+        _recordingPath = path;
+      });
+
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _recordDuration++;
+        });
+      });
+    } catch (e) {
+      debugPrint("Error starting recording: $e");
+    }
+  }
+
+  Future<void> _stopRecording({bool send = true}) async {
+    _recordTimer?.cancel();
+    final path = await _audioRecorder.stop();
+    setState(() {
+      _isRecording = false;
+      _recordDuration = 0;
+    });
+
+    if (path != null && send) {
+      _sendVoice(path);
+    } else if (path != null) {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+  }
+
+  Future<void> _sendVoice(String filePath) async {
+    setState(() => _isSending = true);
+    try {
+      final msg = await _api.uploadChatVoice(widget.partner.id, filePath);
+      setState(() {
+        _messages.add(msg);
+        _isSending = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      setState(() => _isSending = false);
+      String errMsg = 'Ses kaydı gönderilemedi.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errMsg = data['message'].toString();
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(errMsg),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  // ─── Gifts Integration ─────────────────────────────────────────────────────
+
+  void _showGiftSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F0D1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return FutureBuilder<List<dynamic>>(
+              future: _api.getGifts(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    height: 350,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Container(
+                    height: 250,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 40),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Hediyeler yüklenemedi.',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final gifts = snapshot.data ?? [];
+                if (gifts.isEmpty) {
+                  return Container(
+                    height: 250,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Aktif hediye bulunamadı.',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  );
+                }
+
+                return Container(
+                  height: MediaQuery.of(context).size.height * 0.55,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Hediye Gönder 🎁',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white60),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: GridView.builder(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 0.82,
+                          ),
+                          itemCount: gifts.length,
+                          itemBuilder: (context, idx) {
+                            final g = gifts[idx];
+                            final emoji = g['emoji'] ?? '🎁';
+                            final name = g['name'] ?? 'Hediye';
+                            final price = (g['price'] is int)
+                                ? (g['price'] as int)
+                                : double.parse(g['price'].toString()).toInt();
+                            final giftId = g['id'] as int;
+
+                            return GestureDetector(
+                              onTap: () => _confirmSendGift(giftId, emoji, name, price),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.cardColor,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppTheme.borderCol,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      emoji,
+                                      style: const TextStyle(fontSize: 38),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      name,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.pink.shade500.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.monetization_on_rounded,
+                                            color: Colors.pink.shade400,
+                                            size: 11,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '$price',
+                                            style: TextStyle(
+                                              color: Colors.pink.shade300,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmSendGift(int giftId, String emoji, String name, int price) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF161426),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$name Gönderilsin mi?',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Bu kullanıcıya $name göndermek istiyor musunuz?\n\nHesabınızdan $price kredi tahsil edilecektir.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('İptal', style: TextStyle(color: Colors.white60)),
+            onPressed: () => Navigator.pop(dialogCtx),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.pink.shade500,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Gönder'),
+            onPressed: () {
+              Navigator.pop(dialogCtx); // Close Dialog
+              Navigator.pop(context); // Close BottomSheet
+              _executeSendGift(giftId, emoji, name, price);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeSendGift(int giftId, String emoji, String name, int price) async {
+    setState(() => _isSending = true);
+    try {
+      final msg = await _api.sendGift(widget.partner.id, giftId);
+      setState(() {
+        _messages.add(msg);
+        _isSending = false;
+      });
+      _scrollToBottom();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$name başarıyla gönderildi! 🎁'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green.shade700,
+      ));
+    } catch (e) {
+      setState(() => _isSending = false);
+      String errMsg = 'Hediye gönderilemedi.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errMsg = data['message'].toString();
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(errMsg),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppTheme.backgroundColor,
@@ -158,7 +575,7 @@ class _ChatScreenState extends State<ChatScreen> {
           itemCount: _messages.length,
           itemBuilder: (_, i) => _bubble(_messages[i]),
         )),
-      _inputBar(),
+      _isRecording ? _recordingInputBar() : _normalInputBar(),
     ]),
   );
 
@@ -215,6 +632,114 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _bubble(MessageModel msg) {
     final isMine = msg.isMine;
+
+    if (msg.type == 'voice') {
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: VoicePlayBubble(
+            url: msg.body,
+            isMine: isMine,
+            createdAt: msg.createdAt,
+          ),
+        ),
+      );
+    }
+
+    if (msg.type == 'gift') {
+      String emoji = '🎁';
+      if (msg.body.startsWith('[GIFT:')) {
+        final parts = msg.body.replaceAll(']', '').split(':');
+        if (parts.length > 2) {
+          emoji = parts[2];
+        }
+      } else {
+        emoji = msg.body;
+      }
+
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.65),
+          padding: const EdgeInsets.all(16),
+          decoration: isMine
+              ? BoxDecoration(
+                  color: Colors.pink.shade500.withOpacity(0.12),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(6),
+                  ),
+                  border: Border.all(color: Colors.pink.shade400.withOpacity(0.7), width: 1.5),
+                )
+              : BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.pink.shade400, Colors.purple.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                    bottomLeft: Radius.circular(6),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  border: Border.all(color: Colors.amber.shade400, width: 2.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.pink.shade500.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                emoji,
+                style: const TextStyle(fontSize: 64),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isMine ? 'Hediye Gönderdin' : 'Sana Bir Hediye Gönderdi!',
+                style: TextStyle(
+                  color: isMine ? Colors.pink.shade200 : Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _timeFormat(msg.createdAt),
+                    style: TextStyle(
+                      color: isMine ? Colors.white54 : Colors.white70,
+                      fontSize: 10,
+                    ),
+                  ),
+                  if (isMine) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.done_all_rounded,
+                      size: 14,
+                      color: msg.isRead ? Colors.white : Colors.white38,
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -231,82 +756,246 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomRight: Radius.circular(isMine ? 4 : 18),
           ),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          if (msg.type == 'image')
-            ClipRRect(borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(imageUrl: msg.body, width: 200))
-          else
-            Text(msg.body, style: const TextStyle(color: Colors.white, fontSize: 15)),
-          const SizedBox(height: 4),
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(_timeFormat(msg.createdAt),
-              style: TextStyle(color: isMine ? Colors.white60 : AppTheme.textSecondary, fontSize: 11)),
-            if (isMine) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.done_all_rounded, size: 14,
-                color: msg.isRead ? Colors.white : Colors.white38),
-            ],
-          ]),
-        ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (msg.type == 'image')
+              GestureDetector(
+                onTap: () => _viewFullScreenImage(msg.body),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: msg.body,
+                    width: 200,
+                    placeholder: (_, __) => Container(
+                      width: 200,
+                      height: 150,
+                      color: Colors.white10,
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(Icons.error),
+                  ),
+                ),
+              )
+            else
+              Text(msg.body, style: const TextStyle(color: Colors.white, fontSize: 15)),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _timeFormat(msg.createdAt),
+                  style: TextStyle(
+                    color: isMine ? Colors.white60 : AppTheme.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+                if (isMine) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.done_all_rounded,
+                    size: 14,
+                    color: msg.isRead ? Colors.white : Colors.white38,
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _inputBar() => Container(
-    decoration: BoxDecoration(
-      color: const Color(0xFF0F0D1A),
-      border: Border(top: BorderSide(color: AppTheme.borderCol, width: 0.5)),
-    ),
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-    child: SafeArea(
-      child: Row(children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppTheme.cardColor, borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.borderCol)),
-            child: Row(children: [
-              const SizedBox(width: 16),
-              Expanded(child: TextField(
-                controller: _msgCtrl,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                maxLines: 4, minLines: 1,
-                decoration: InputDecoration.collapsed(
-                  hintText: 'Mesaj yaz...',
-                  hintStyle: TextStyle(color: AppTheme.textSecondary)),
-                onSubmitted: (_) => _send(),
-              )),
-              IconButton(
-                icon: Icon(Icons.attach_file_rounded, color: AppTheme.textSecondary),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Fotoğraf/Dosya gönderme özelliği yakında! 🚀'),
-                    behavior: SnackBarBehavior.floating,
-                  ));
-                },
+  void _viewFullScreenImage(String url) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: CachedNetworkImage(
+                imageUrl: url,
+                placeholder: (_, __) => const CircularProgressIndicator(),
+                errorWidget: (_, __, ___) => const Icon(Icons.error, color: Colors.white),
               ),
-            ]),
+            ),
           ),
         ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: _send,
-          child: Container(
-            width: 48, height: 48,
-            decoration: BoxDecoration(gradient: AppTheme.primaryGradient, shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: AppTheme.primaryColor.withOpacity(0.4),
-                blurRadius: 12, offset: const Offset(0, 4))]),
-            child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-          ),
-        ),
-      ]),
-    ),
-  );
+      ),
+    );
+  }  Widget _normalInputBar() {
+    final showSend = _msgCtrl.text.trim().isNotEmpty || _isSending;
 
-  String _timeFormat(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F0D1A),
+        border: Border(top: BorderSide(color: AppTheme.borderCol, width: 0.5)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.cardColor,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppTheme.borderCol),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(Icons.card_giftcard_rounded, color: Colors.pink.shade400, size: 22),
+                      onPressed: _showGiftSheet,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _msgCtrl,
+                        onChanged: (text) {
+                          setState(() {});
+                        },
+                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                        maxLines: 4,
+                        minLines: 1,
+                        decoration: InputDecoration.collapsed(
+                          hintText: 'Mesaj yaz...',
+                          hintStyle: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        onSubmitted: (_) => _send(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.attach_file_rounded, color: AppTheme.textSecondary),
+                      onPressed: _showAttachmentOptions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: showSend ? _send : _startRecording,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: showSend ? AppTheme.primaryGradient : null,
+                  color: showSend ? null : const Color(0xFF1E1B30),
+                  shape: BoxShape.circle,
+                  border: showSend ? null : Border.all(color: AppTheme.borderCol),
+                  boxShadow: showSend
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Icon(
+                  showSend ? Icons.send_rounded : Icons.mic_rounded,
+                  color: showSend ? Colors.white : Colors.white70,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recordingInputBar() => Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0D1A),
+          border: Border(top: BorderSide(color: AppTheme.borderCol, width: 0.5)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SafeArea(
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 28),
+                onPressed: () => _stopRecording(send: false),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppTheme.borderCol),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Ses Kaydediliyor...',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _formatRecordDuration(_recordDuration),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () => _stopRecording(send: true),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  String _formatRecordDuration(int seconds) {
+    final m = (seconds ~/ 60).toString();
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   String _formatLastSeen(String? lastSeenIso, bool isOnline) {
@@ -331,5 +1020,192 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (_) {
       return 'Çevrimdışı';
     }
+  }
+
+  String _timeFormat(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+}
+
+class VoicePlayBubble extends StatefulWidget {
+  final String url;
+  final bool isMine;
+  final DateTime createdAt;
+
+  const VoicePlayBubble({
+    Key? key,
+    required this.url,
+    required this.isMine,
+    required this.createdAt,
+  }) : super(key: key);
+
+  @override
+  State<VoicePlayBubble> createState() => _VoicePlayBubbleState();
+}
+
+class _VoicePlayBubbleState extends State<VoicePlayBubble> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  StreamSubscription? _posSub;
+  StreamSubscription? _durSub;
+  StreamSubscription? _stateSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAudio();
+  }
+
+  void _initAudio() {
+    _stateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+
+    _durSub = _audioPlayer.onDurationChanged.listen((newDuration) {
+      if (mounted) {
+        setState(() {
+          _duration = newDuration;
+        });
+      }
+    });
+
+    _posSub = _audioPlayer.onPositionChanged.listen((newPosition) {
+      if (mounted) {
+        setState(() {
+          _position = newPosition;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _durSub?.cancel();
+    _stateSub?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlay() async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play(UrlSource(widget.url));
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.toString();
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbleColor = widget.isMine ? const Color(0xFF6366F1) : const Color(0xFF1E293B);
+    final buttonColor = widget.isMine ? const Color(0xFF4F46E5) : const Color(0xFF4338CA);
+    final progressColor = widget.isMine ? Colors.white60 : Colors.indigo.shade400;
+
+    return Container(
+      width: 240,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(18),
+          topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(widget.isMine ? 18 : 4),
+          bottomRight: Radius.circular(widget.isMine ? 4 : 18),
+        ),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _togglePlay,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: buttonColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                    activeTrackColor: progressColor,
+                    inactiveTrackColor: Colors.white12,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    min: 0.0,
+                    max: _duration.inMilliseconds.toDouble() > 0
+                        ? _duration.inMilliseconds.toDouble()
+                        : 1.0,
+                    value: _position.inMilliseconds.toDouble().clamp(
+                        0.0,
+                        _duration.inMilliseconds.toDouble() > 0
+                            ? _duration.inMilliseconds.toDouble()
+                            : 1.0),
+                    onChanged: (val) {
+                      _audioPlayer.seek(Duration(milliseconds: val.toInt()));
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _isPlaying
+                          ? _formatDuration(_position)
+                          : _formatDuration(_duration),
+                      style: TextStyle(
+                        color: widget.isMine ? Colors.white70 : Colors.grey.shade400,
+                        fontSize: 10,
+                      ),
+                    ),
+                    Text(
+                      _timeFormat(widget.createdAt),
+                      style: TextStyle(
+                        color: widget.isMine ? Colors.white70 : Colors.grey.shade400,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _timeFormat(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 }

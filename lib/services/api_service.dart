@@ -204,6 +204,32 @@ class ApiService {
     return res.data['unread_count'] as int? ?? 0;
   }
 
+  Future<List<dynamic>> getGifts() async {
+    final res = await _dio.get('/gifts');
+    return res.data['gifts'] as List<dynamic>;
+  }
+
+  Future<MessageModel> uploadChatImage(int userId, String filePath) async {
+    final formData = FormData.fromMap({
+      'image': await MultipartFile.fromFile(filePath, filename: 'chat_image.jpg'),
+    });
+    final res = await _dio.post('/chat/$userId/upload-image', data: formData);
+    return MessageModel.fromJson(res.data['message'] as Map<String, dynamic>);
+  }
+
+  Future<MessageModel> uploadChatVoice(int userId, String filePath) async {
+    final formData = FormData.fromMap({
+      'voice': await MultipartFile.fromFile(filePath, filename: 'voice_message.m4a'),
+    });
+    final res = await _dio.post('/chat/$userId/upload-voice', data: formData);
+    return MessageModel.fromJson(res.data['message'] as Map<String, dynamic>);
+  }
+
+  Future<MessageModel> sendGift(int userId, int giftId) async {
+    final res = await _dio.post('/chat/$userId/gift', data: {'gift_id': giftId});
+    return MessageModel.fromJson(res.data['message'] as Map<String, dynamic>);
+  }
+
   // ─── Social ───────────────────────────────────────────────────────────────
 
   Future<bool> likeUser(int userId) async {

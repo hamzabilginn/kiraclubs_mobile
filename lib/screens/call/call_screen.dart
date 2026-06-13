@@ -37,6 +37,7 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     CallScreen.isActive = true;
+    _initAgora(); // Initialize Agora immediately in the background
     _startRingSimulation();
   }
 
@@ -64,10 +65,11 @@ class _CallScreenState extends State<CallScreen> {
   // Simulate call connection after 3 seconds of ringing
   void _startRingSimulation() {
     _ringTimer = Timer(const Duration(seconds: 3), () {
-      setState(() {
-        _isRinging = false;
-      });
-      _initAgora();
+      if (mounted) {
+        setState(() {
+          _isRinging = false;
+        });
+      }
     });
   }
 
@@ -92,7 +94,14 @@ class _CallScreenState extends State<CallScreen> {
       await _engine!.initialize(RtcEngineContext(
         appId: callInfo['app_id'],
         channelProfile: ChannelProfileType.channelProfileCommunication,
+        areaCode: AreaCode.areaCodeEu.value(), // European servers for lowest latency in Turkey/Europe
       ));
+
+      // Optimize audio scenario for low latency and high quality speech
+      await _engine!.setAudioProfile(
+        profile: AudioProfileType.audioProfileSpeechStandard,
+        scenario: AudioScenarioType.audioScenarioGameStreaming,
+      );
 
       _engine!.registerEventHandler(
         RtcEngineEventHandler(

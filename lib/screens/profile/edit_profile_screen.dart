@@ -17,17 +17,24 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
   late TabController _tabController;
+  late TextEditingController _nameController;
+  late TextEditingController _bioController;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _nameController = TextEditingController(text: auth.user?.name ?? '');
+    _bioController = TextEditingController(text: auth.user?.bio ?? '');
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _nameController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -69,6 +76,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     }
   }
 
+  Future<void> _saveProfile() async {
+    final nameText = _nameController.text.trim();
+    if (nameText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('İsim boş olamaz.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final updatedUser = await _api.updateProfile(
+        name: nameText,
+        bio: _bioController.text.trim(),
+      );
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      auth.updateUser(updatedUser);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Profil başarıyla güncellendi.'),
+          backgroundColor: Colors.green,
+        ));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Profil güncellenirken bir hata oluştu.'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -99,7 +146,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _saveProfile,
             child: const Text('Değişiklikleri Tamamla', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
           ),
         ],

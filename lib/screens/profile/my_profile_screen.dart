@@ -32,6 +32,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
   Map<String, dynamic> _dailyTasks = {};
   
   // Controllers & Form State
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _agencyInviteController = TextEditingController();
   bool _isIncognito = false;
@@ -47,6 +48,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
   @override
   void dispose() {
     _tabController.dispose();
+    _nameController.dispose();
     _bioController.dispose();
     _agencyInviteController.dispose();
     super.dispose();
@@ -62,6 +64,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
         setState(() {
           _user = data['user'] as UserModel;
           _dailyTasks = data['daily_tasks'] as Map<String, dynamic>? ?? {};
+          _nameController.text = _user?.name ?? '';
           _bioController.text = _user?.bio ?? '';
           _isIncognito = _user?.isIncognito ?? false;
           _isLoading = false;
@@ -88,9 +91,15 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
   }
 
   Future<void> _saveChanges() async {
+    final nameText = _nameController.text.trim();
+    if (nameText.isEmpty) {
+      _showToast('İsim alanı boş bırakılamaz!', isError: true);
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       final updatedUser = await _api.updateProfile(
+        name: nameText,
         bio: _bioController.text.trim(),
         isIncognito: _isIncognito,
       );
@@ -936,6 +945,32 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
+          'AD SOYAD',
+          style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _nameController,
+          maxLength: 50,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: 'Adınız ve soyadınız...',
+            hintStyle: const TextStyle(color: Colors.white30),
+            filled: true,
+            fillColor: const Color(0xFF1E293B).withOpacity(0.3),
+            counterStyle: const TextStyle(color: Colors.white38),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: const Color(0xFF6366F1)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
           'HAKKIMDA',
           style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
@@ -957,7 +992,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFF6366F1)),
+              borderSide: const BorderSide(color: const Color(0xFF6366F1)),
             ),
           ),
         ),

@@ -30,8 +30,8 @@ class _AutoplayVideoWidgetState extends State<AutoplayVideoWidget> {
   Future<void> _initializePlayer() async {
     try {
       _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-      // Add a 3-second timeout to prevent infinite hangs on unsupported codecs/networks
-      await _controller.initialize().timeout(const Duration(seconds: 3));
+      // Add a 15-second timeout to prevent infinite hangs on unsupported codecs/networks
+      await _controller.initialize().timeout(const Duration(seconds: 15));
       if (mounted) {
         setState(() {
           _isInitialized = true;

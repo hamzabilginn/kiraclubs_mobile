@@ -205,6 +205,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
               }
             },
           ),
+          const SizedBox(height: 30),
+          const Text('BİLGİLER', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Ad Soyad',
+              labelStyle: const TextStyle(color: AppTheme.textSecondary),
+              filled: true,
+              fillColor: const Color(0xFF1E1B2E),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: const Icon(Icons.person_rounded, color: AppTheme.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _bioController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Hakkımda / Biyografi',
+              labelStyle: const TextStyle(color: AppTheme.textSecondary),
+              filled: true,
+              fillColor: const Color(0xFF1E1B2E),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: const Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );

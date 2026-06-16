@@ -43,6 +43,4 @@ Bu dosya, KiraClubs projesinde çalışan yapay zeka ajanlarının (Gemini vb.) 
 1. **Mobil Uygulama Derlemesi ve Test:**
    - Mobil uygulamayı emülatörde veya gerçek cihazda yeniden derleyin (clean build yapılması önerilir).
    - Giriş ekranındaki Google ve TikTok butonlarının tarayıcıyı açtığını ve giriş yaptıktan sonra uygulamaya başarıyla geri dönüp oturum açtığını doğrulayın.
-2. **Facebook Girişinin Tamamlanması (İstenirse):**
-   - Şu an mobil arayüzde Facebook butonu ve backend yönlendirmesi hazır durumdadır.
-   - Eğer Facebook ile giriş aktif edilmek istenirse, `developers.facebook.com` üzerinden App oluşturulmalı, App ID ve Secret bilgileri hem Firebase Authentication -> Facebook alanına hem de AWS `.env` dosyasına (`FACEBOOK_CLIENT_ID` ve `FACEBOOK_CLIENT_SECRET`) girilmelidir.
+

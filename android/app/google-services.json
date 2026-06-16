@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "505994546059",
+    "project_id": "kiraclubs-d2cba",
+    "storage_bucket": "kiraclubs-d2cba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505994546059:android:ac26ee1874232f78803d8e",
+        "android_client_info": {
+          "package_name": "com.kiraclubs.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-vTESeRbmD41-6pR_wuiPPvvlpwR7-9A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

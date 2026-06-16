@@ -90,11 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _launchSocialAuth(String provider) async {
     final url = Uri.parse('https://www.kiraclubs.com/auth/redirect/$provider?platform=mobile');
     try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch $url';
-      }
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       print("Social auth launch error: $e");
       if (mounted) {
@@ -234,18 +230,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Google',
                     onTap: auth.isLoading ? null : () => _launchSocialAuth('google'),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   _buildSocialLoginButton(
                     iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Ionicons_logo-tiktok.svg/24px-Ionicons_logo-tiktok.svg.png',
                     label: 'TikTok',
                     iconColor: Colors.white,
                     onTap: auth.isLoading ? null : () => _launchSocialAuth('tiktok'),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSocialLoginButton(
-                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/24px-Facebook_Logo_%282019%29.png',
-                    label: 'Facebook',
-                    onTap: auth.isLoading ? null : () => _launchSocialAuth('facebook'),
                   ),
                 ],
               ),

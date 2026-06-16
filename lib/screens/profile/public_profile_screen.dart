@@ -838,6 +838,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     final reasons = [
       'Spam veya Şüpheli Hesap',
       'Uygunsuz Fotoğraf / Video',
+      'Çocuk İstismarı veya Sömürüsü (CSAE/CSAM)',
       'Taciz / Rahatsız Etme',
       'Sahte Profil / Başkası Gibi Davranma',
       'Diğer Nedenler'

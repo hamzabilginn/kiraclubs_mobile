@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app_links/app_links.dart';
+import 'dart:async';
+import 'dart:convert';
 import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../widgets/gradient_button.dart';
@@ -21,8 +24,91 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _obscurePass   = true;
 
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinkListener();
+  }
+
+  void _initDeepLinkListener() {
+    _appLinks = AppLinks();
+    
+    // Check initial link if app was closed and opened via deep link
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) {
+        _handleDeepLink(uri);
+      }
+    });
+
+    // Listen to incoming links when app is in background/foreground
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      print("Deep link listener error: $err");
+    });
+  }
+
+  Future<void> _handleDeepLink(Uri uri) async {
+    print("Received Deep Link: $uri");
+    if (uri.scheme == 'kiraclubs' && uri.host == 'auth' && uri.path == '/callback') {
+      final token = uri.queryParameters['token'];
+      final userDataEncoded = uri.queryParameters['user'];
+      
+      if (token != null && userDataEncoded != null) {
+        try {
+          final userDataDecoded = Uri.decodeComponent(userDataEncoded);
+          final userJson = jsonDecode(userDataDecoded);
+          
+          final auth = Provider.of<AuthProvider>(context, listen: false);
+          await auth.loginWithTokenAndUser(token, userJson);
+          
+          if (!mounted) return;
+          if (auth.isAuthenticated) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const MainNavScreen()),
+            );
+            Future.delayed(const Duration(milliseconds: 600), () {
+              NotificationService.handlePendingNotification();
+            });
+          }
+        } catch (e) {
+          print("Error processing deep link user data: $e");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Sosyal giriş bilgileri işlenirken bir hata oluştu.'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _launchSocialAuth(String provider) async {
+    final url = Uri.parse('https://www.kiraclubs.com/auth/redirect/$provider?platform=mobile');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      print("Social auth launch error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('$provider giriş sayfası açılamadı.'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _linkSubscription?.cancel();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
@@ -128,7 +214,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ]),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('veya sosyal medya ile giriş yapın', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)),
+                  ),
+                  Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialLoginButton(
+                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/24px-Google_%22G%22_logo.svg.png',
+                    label: 'Google',
+                    onTap: auth.isLoading ? null : () => _launchSocialAuth('google'),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildSocialLoginButton(
+                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Ionicons_logo-tiktok.svg/24px-Ionicons_logo-tiktok.svg.png',
+                    label: 'TikTok',
+                    iconColor: Colors.white,
+                    onTap: auth.isLoading ? null : () => _launchSocialAuth('tiktok'),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildSocialLoginButton(
+                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/24px-Facebook_Logo_%282019%29.png',
+                    label: 'Facebook',
+                    onTap: auth.isLoading ? null : () => _launchSocialAuth('facebook'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
               Center(
                 child: GestureDetector(
                   onTap: () => Navigator.push(context,
@@ -250,6 +371,44 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSocialLoginButton({
+    required String iconUrl,
+    required String label,
+    Color? iconColor,
+    VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: Colors.white.withOpacity(0.12)),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFF1E1B2E).withOpacity(0.3),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.network(
+              iconUrl,
+              height: 16,
+              width: 16,
+              color: iconColor,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.login, size: 16, color: Colors.white);
+              },
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }

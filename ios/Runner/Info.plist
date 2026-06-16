@@ -66,6 +66,19 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.kiraclubs.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kiraclubs</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Görüntülü görüşmeler için kameranıza erişmemiz gerekiyor.</string>
 	<key>NSMicrophoneUsageDescription</key>

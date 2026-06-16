@@ -12,7 +12,20 @@
           "package_name": "com.kiraclubs.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "505994546059-coldbo44te0qo6dmmns6mqt1tn5gpmml.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kiraclubs.app",
+            "certificate_hash": "603082e8a11b871bb3275ff3ff07a54572c14c9c"
+          }
+        },
+        {
+          "client_id": "505994546059-gstsogpehp39evffq3r7flholuqqto02.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyD-vTESeRbmD41-6pR_wuiPPvvlpwR7-9A"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "505994546059-gstsogpehp39evffq3r7flholuqqto02.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

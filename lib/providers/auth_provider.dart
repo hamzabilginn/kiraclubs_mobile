@@ -129,6 +129,20 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loginWithTokenAndUser(String token, Map<String, dynamic> userJson) async {
+    _setLoading(true);
+    try {
+      await _saveSession({
+        'token': token,
+        'user': userJson,
+      });
+    } catch (e) {
+      print("loginWithTokenAndUser error: $e");
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   Future<void> _saveSession(Map<String, dynamic> data) async {

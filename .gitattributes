@@ -1,0 +1,11 @@
+* text=auto
+*.pbxproj text eol=lf
+*.xcworkspacedata text eol=lf
+*.xcscheme text eol=lf
+*.plist text eol=lf
+*.h text eol=lf
+*.m text eol=lf
+*.swift text eol=lf
+*.storyboard text eol=lf
+*.xcsettings text eol=lf
+Podfile text eol=lf

@@ -54,7 +54,7 @@ dependencies:
   # WebSockets
 
   # Video/Voice Rooms (Agora)
-  agora_rtc_engine: ^6.3.2
+  agora_rtc_engine: ^6.6.3
 
   # In-App Purchase
   in_app_purchase: ^3.2.0
@@ -76,6 +76,7 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/images/app_icon.png"
 
 flutter:
+  disable-swift-package-manager: true
   uses-material-design: true
 
   assets:

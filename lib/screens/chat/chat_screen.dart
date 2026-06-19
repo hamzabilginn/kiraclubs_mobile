@@ -998,6 +998,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(width: 6),
+            /*
             GestureDetector(
               onTap: _showGiftSheet,
               child: Container(
@@ -1011,6 +1012,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(width: 6),
+            */
             GestureDetector(
               onTap: _startRecording,
               child: Container(

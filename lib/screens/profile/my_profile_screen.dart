@@ -486,17 +486,19 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
             _buildVerificationCard(user),
             const SizedBox(height: 16),
 
-            // Agency system card (female only)
-            if (isFemale) ...[
+            // Agency system card (female only) - Hidden for Apple Review
+            /*
+            if (user.gender == 'female') ...[
               _buildAgencySection(user),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
 
             // Agency management redirect
             if (user.isAgencyOwner) ...[
               _buildAgencyGoToButton(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
+            */
 
             // Support card
             _buildSupportCard(),

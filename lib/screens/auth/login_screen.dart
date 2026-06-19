@@ -230,7 +230,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Google',
                     onTap: auth.isLoading ? null : () => _launchSocialAuth('google'),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  _buildSocialLoginButton(
+                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/24px-Apple_logo_black.svg.png',
+                    label: 'Apple',
+                    iconColor: Colors.white,
+                    onTap: auth.isLoading ? null : () => _launchSocialAuth('apple'),
+                  ),
+                  const SizedBox(width: 8),
                   _buildSocialLoginButton(
                     iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Ionicons_logo-tiktok.svg/24px-Ionicons_logo-tiktok.svg.png',
                     label: 'TikTok',

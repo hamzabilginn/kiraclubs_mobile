@@ -363,7 +363,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Gift Showcase Section
+                // Gift Showcase Section (Hidden for App Store Compliance)
+                /*
                 const Row(
                   children: [
                     Text('🎁', style: TextStyle(fontSize: 14)),
@@ -382,6 +383,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 const SizedBox(height: 10),
                 _buildGiftGrid(u.gifts),
                 const SizedBox(height: 24),
+                */
 
                 // Status Posts Section
                 if (u.statuses.isNotEmpty) ...[
@@ -740,7 +742,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Gift Button (🎁)
+          // Gift Button (🎁) - Hidden for App Store Compliance
+          /*
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -760,6 +763,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ),
           ),
           const SizedBox(width: 12),
+          */
 
           // Chat Button (💬)
           GestureDetector(

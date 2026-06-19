@@ -216,11 +216,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
 
               const SizedBox(height: 24),
-              Center(
-                child: Text(
-                  'Kayıt olarak Gizlilik Politikamızı\nve Kullanım Şartlarımızı kabul etmiş olursunuz.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Kayıt olarak EULA ve Kullanım Şartlarımızı kabul etmiş olursunuz.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Kötü niyetli kullanım, taciz veya sakıncalı içeriklere kesinlikle sıfır tolerans gösterilmektedir (Zero Tolerance). Kural ihlali yapan kullanıcılar anında ve kalıcı olarak banlanır.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'dart:io';
 import 'dart:convert';
 import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
@@ -211,42 +212,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 ]),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('veya sosyal medya ile giriş yapın', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)),
-                  ),
-                  Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildSocialLoginButton(
-                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/24px-Google_%22G%22_logo.svg.png',
-                    label: 'Google',
-                    onTap: auth.isLoading ? null : () => _launchSocialAuth('google'),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSocialLoginButton(
-                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/24px-Apple_logo_black.svg.png',
-                    label: 'Apple',
-                    iconColor: Colors.white,
-                    onTap: auth.isLoading ? null : () => _launchSocialAuth('apple'),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildSocialLoginButton(
-                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Ionicons_logo-tiktok.svg/24px-Ionicons_logo-tiktok.svg.png',
-                    label: 'TikTok',
-                    iconColor: Colors.white,
-                    onTap: auth.isLoading ? null : () => _launchSocialAuth('tiktok'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
+              if (!Platform.isIOS) ...[
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('veya sosyal medya ile giriş yapın', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)),
+                    ),
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.08), thickness: 1)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildSocialLoginButton(
+                      iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/24px-Google_%22G%22_logo.svg.png',
+                      label: 'Google',
+                      onTap: auth.isLoading ? null : () => _launchSocialAuth('google'),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildSocialLoginButton(
+                      iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Ionicons_logo-tiktok.svg/24px-Ionicons_logo-tiktok.svg.png',
+                      label: 'TikTok',
+                      iconColor: Colors.white,
+                      onTap: auth.isLoading ? null : () => _launchSocialAuth('tiktok'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
               Center(
                 child: GestureDetector(
                   onTap: () => Navigator.push(context,

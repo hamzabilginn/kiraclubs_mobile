@@ -962,7 +962,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }  Widget _normalInputBar() {
     final showSend = _msgCtrl.text.trim().isNotEmpty || _isSending;
-    final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = auth.user;
+    final isUnderReview = (currentUser?.iosInReview ?? false) && Platform.isIOS;
     
     String hintText = 'Mesajını yaz...';
     if (currentUser != null) {

@@ -85,5 +85,7 @@
 	<string>Görüntülü görüşmeler için kameranıza erişmemiz gerekiyor.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sesli ve görüntülü görüşmeler için mikrofonunuza erişmemiz gerekiyor.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Yakınınızdaki sesli sohbet odalarını ve diğer kullanıcıları keşfetmeniz için konum bilgisine erişmemiz gerekiyor.</string>
 </dict>
 </plist>

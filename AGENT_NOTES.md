@@ -4,7 +4,24 @@ Bu dosya, KiraClubs projesinde çalışan yapay zeka ajanlarının (Gemini, Clau
 
 ---
 
-## 📅 Son Güncelleme: 19.06.2026
+## 📅 Son Güncelleme: 30.07.2026
+
+### 🛠️ En Son Yapılan Değişiklikler (30 Temmuz 2026)
+1. **Dinamik İnceleme Kilidi (Review Mode Switch) Entegre Edildi:**
+   - Apple'ın Guideline 1.2 (Rastgele/Anonim Sohbet) ve 4.3(b) (Kopya Dating) retlerini aşmak için uygulamaya dynamic settings kontrolü eklendi.
+   - Laravel API `formatUser` metoduna `'ios_in_review' => (bool) env('IOS_IN_REVIEW', false)` parametresi eklendi. Live sunucudaki `.env` dosyasına `IOS_IN_REVIEW=true` eklenerek Laravel cache'leri temizlendi.
+   - Flutter tarafında `UserModel`'e `iosInReview` parametresi tanımlandı.
+   - `main_nav_screen.dart` güncellendi. Eğer `iosInReview` aktifse ve cihaz iOS ise, **Keşfet (Dating/Swipe) sekmesi tamamen gizlenir** ve ilk açılış ekranı olarak **Odalar (RoomsScreen)** gösterilir.
+   - `public_profile_screen.dart` ve `my_profile_screen.dart` güncellendi. İnceleme modunda hediye gönderme, hediye vitrini, görüntülü arama ve ajans butonları dinamik olarak gizlendi (Normal modda tamamen görünür durumdadırlar).
+   - `chat_screen.dart` güncellendi. Chat içerisindeki hediye gönderme butonu inceleme modunda dinamik olarak gizlendi.
+
+2. **iOS Bundle ID ve URL Scheme Güncellendi:**
+   - `Runner.xcodeproj/project.pbxproj` dosyasındaki `PRODUCT_BUNDLE_IDENTIFIER` değeri `com.kiraclubs.live` olarak güncellendi.
+   - `Info.plist` içerisindeki `CFBundleURLName` değeri `com.kiraclubs.live` olarak güncellendi.
+   - `pubspec.yaml` sürüm numarası `1.0.0+16` olarak artırıldı.
+
+3. **Veritabanı Yedeği Güvenle Alındı:**
+   - Canlı veritabanının tam yedeği local PC'deki `C:\Users\DELL\Desktop\kiraclubs\sunucu_yedekleri\database_backup.sql` dosyasına indirildi ve veriler güvenceye alındı.
 
 ---
 

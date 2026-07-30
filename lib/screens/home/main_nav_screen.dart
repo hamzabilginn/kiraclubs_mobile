@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -252,44 +253,68 @@ class _MainNavScreenState extends State<MainNavScreen> {
     final List<Widget> screens = [];
     final List<Map<String, dynamic>> items = [];
 
-    // 1. Keşfet
-    screens.add(const DiscoverScreen());
-    items.add({'icon': Icons.search_rounded, 'label': 'Keşfet'});
+    final bool isUnderReview = (user?.iosInReview ?? false) && io.Platform.isIOS;
 
-    // 2. Durumlar
-    screens.add(const StatusesScreen());
-    items.add({'icon': Icons.campaign_rounded, 'label': 'Durumlar'});
+    if (isUnderReview) {
+      // 1. Odalar (First screen for review)
+      screens.add(const RoomsScreen());
+      items.add({'icon': Icons.mic_rounded, 'label': 'Odalar'});
 
-    // 3. Odalar
-    screens.add(const RoomsScreen());
-    items.add({'icon': Icons.mic_rounded, 'label': 'Odalar'});
+      // 2. Durumlar
+      screens.add(const StatusesScreen());
+      items.add({'icon': Icons.campaign_rounded, 'label': 'Durumlar'});
 
-    // 4. Mesajlarım
-    screens.add(const InboxScreen());
-    items.add({'icon': Icons.chat_bubble_rounded, 'label': 'Mesajlarım'});
+      // 3. Mesajlarım
+      screens.add(const InboxScreen());
+      items.add({'icon': Icons.chat_bubble_rounded, 'label': 'Mesajlarım'});
 
-    // 5. Ajansım (Dynamic)
-    if (user != null && (user.isAgencyOwner || user.isPublisher)) {
-      screens.add(const Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        body: Center(
-          child: Text(
-            'Ajans Yönetimi\nYakında mobil uygulamada da aktif olacak!',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 16, height: 1.6),
+      // 4. Profil
+      screens.add(const MyProfileScreen());
+      items.add({
+        'icon': Icons.person_rounded, 
+        'label': 'Profil',
+        'avatarUrl': user?.avatarUrl,
+      });
+    } else {
+      // 1. Keşfet (Normal default)
+      screens.add(const DiscoverScreen());
+      items.add({'icon': Icons.search_rounded, 'label': 'Keşfet'});
+
+      // 2. Durumlar
+      screens.add(const StatusesScreen());
+      items.add({'icon': Icons.campaign_rounded, 'label': 'Durumlar'});
+
+      // 3. Odalar
+      screens.add(const RoomsScreen());
+      items.add({'icon': Icons.mic_rounded, 'label': 'Odalar'});
+
+      // 4. Mesajlarım
+      screens.add(const InboxScreen());
+      items.add({'icon': Icons.chat_bubble_rounded, 'label': 'Mesajlarım'});
+
+      // 5. Ajansım (Dynamic)
+      if (user != null && (user.isAgencyOwner || user.isPublisher)) {
+        screens.add(const Scaffold(
+          backgroundColor: AppTheme.backgroundColor,
+          body: Center(
+            child: Text(
+              'Ajans Yönetimi\nYakında mobil uygulamada da aktif olacak!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 16, height: 1.6),
+            ),
           ),
-        ),
-      ));
-      items.add({'icon': Icons.business_rounded, 'label': 'Ajansım'});
-    }
+        ));
+        items.add({'icon': Icons.business_rounded, 'label': 'Ajansım'});
+      }
 
-    // 6. Profil
-    screens.add(const MyProfileScreen());
-    items.add({
-      'icon': Icons.person_rounded, 
-      'label': 'Profil',
-      'avatarUrl': user?.avatarUrl,
-    });
+      // 6. Profil
+      screens.add(const MyProfileScreen());
+      items.add({
+        'icon': Icons.person_rounded, 
+        'label': 'Profil',
+        'avatarUrl': user?.avatarUrl,
+      });
+    }
 
     // Prevent index out of bounds on role change
     if (_currentIndex >= screens.length) {

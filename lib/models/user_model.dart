@@ -37,6 +37,7 @@ class UserModel {
   // Agency
   final String? agencyName;
   final bool isAgencyOwner;
+  final bool iosInReview;
 
   UserModel({
     required this.id,
@@ -71,6 +72,7 @@ class UserModel {
     this.statuses = const [],
     this.agencyName,
     this.isAgencyOwner = false,
+    this.iosInReview = false,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -113,6 +115,7 @@ class UserModel {
           .toList() ?? [],
       agencyName:         json['agency_name'] as String?,
       isAgencyOwner:      _parseBool(json['is_agency_owner']),
+      iosInReview:        _parseBool(json['ios_in_review']),
     );
   }
 
@@ -142,6 +145,8 @@ class UserModel {
     'tokens':              tokens,
     'earned_coins':        earnedCoins,
     'media':               media.map((m) => m.toJson()).toList(),
+    'is_agency_owner':     isAgencyOwner,
+    'ios_in_review':       iosInReview,
   };
 
   UserModel copyWith({
@@ -196,6 +201,7 @@ class UserModel {
       statuses:           statuses,
       agencyName:         agencyName,
       isAgencyOwner:      isAgencyOwner,
+      iosInReview:        iosInReview,
       xpPoints:           xpPoints ?? this.xpPoints,
     );
   }

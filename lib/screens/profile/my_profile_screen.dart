@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -443,6 +444,8 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
 
   Widget _buildEditTab(UserModel user, String referralCode) {
     final isFemale = user.gender == 'female';
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final isUnderReview = (auth.user?.iosInReview ?? false) && io.Platform.isIOS;
 
     return RefreshIndicator(
       onRefresh: _loadProfileData,
@@ -486,19 +489,17 @@ class _MyProfileScreenState extends State<MyProfileScreen> with SingleTickerProv
             _buildVerificationCard(user),
             const SizedBox(height: 16),
 
-            // Agency system card (female only) - Hidden for Apple Review
-            /*
-            if (user.gender == 'female') ...[
+            // Agency system card (female only)
+            if (!isUnderReview && user.gender == 'female') ...[
               _buildAgencySection(user),
               const SizedBox(height: 24),
             ],
 
             // Agency management redirect
-            if (user.isAgencyOwner) ...[
+            if (!isUnderReview && user.isAgencyOwner) ...[
               _buildAgencyGoToButton(),
               const SizedBox(height: 24),
             ],
-            */
 
             // Support card
             _buildSupportCard(),

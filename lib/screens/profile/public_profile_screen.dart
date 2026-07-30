@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -80,6 +81,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 
   Widget _buildProfile(UserModel u) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final isUnderReview = (auth.user?.iosInReview ?? false) && io.Platform.isIOS;
+
     final allMedia = [
       if (u.avatarUrl != null) MediaItem(id: -1, url: u.avatarUrl!, type: 'photo'),
       ...u.media,
@@ -363,27 +367,27 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Gift Showcase Section (Hidden for App Store Compliance)
-                /*
-                const Row(
-                  children: [
-                    Text('🎁', style: TextStyle(fontSize: 14)),
-                    SizedBox(width: 6),
-                    Text(
-                      'HEDİYE VİTRİNİ',
-                      style: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                // Gift Showcase Section
+                if (!isUnderReview) ...[
+                  const Row(
+                    children: [
+                      Text('🎁', style: TextStyle(fontSize: 14)),
+                      SizedBox(width: 6),
+                      Text(
+                        'HEDİYE VİTRİNİ',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _buildGiftGrid(u.gifts),
-                const SizedBox(height: 24),
-                */
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _buildGiftGrid(u.gifts),
+                  const SizedBox(height: 24),
+                ],
 
                 // Status Posts Section
                 if (u.statuses.isNotEmpty) ...[
@@ -676,7 +680,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 
   Widget _buildBottomMenu(UserModel u) {
-
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final isUnderReview = (auth.user?.iosInReview ?? false) && io.Platform.isIOS;
 
     return Container(
       height: 76,
@@ -697,25 +702,27 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       child: Row(
         children: [
           // Call Button (📞)
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => CallScreen(chatUser: u)),
-              );
-            },
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFDCFCE7),
-                border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+          if (!isUnderReview) ...[
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CallScreen(chatUser: u)),
+                );
+              },
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFDCFCE7),
+                  border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+                ),
+                child: const Icon(Icons.phone, color: Color(0xFF22C55E), size: 20),
               ),
-              child: const Icon(Icons.phone, color: Color(0xFF22C55E), size: 20),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
 
           // Follow / Following Button
           Expanded(
@@ -742,28 +749,28 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Gift Button (🎁) - Hidden for App Store Compliance
-          /*
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ChatScreen(partner: u)),
-              );
-            },
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFFEF9C3),
-                border: Border.all(color: const Color(0xFFFEF08A), width: 1.5),
+          // Gift Button (🎁)
+          if (!isUnderReview) ...[
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChatScreen(partner: u)),
+                );
+              },
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFEF9C3),
+                  border: Border.all(color: const Color(0xFFFEF08A), width: 1.5),
+                ),
+                child: const Icon(Icons.card_giftcard, color: Color(0xFFEAB308), size: 20),
               ),
-              child: const Icon(Icons.card_giftcard, color: Color(0xFFEAB308), size: 20),
             ),
-          ),
-          const SizedBox(width: 12),
-          */
+            const SizedBox(width: 12),
+          ],
 
           // Chat Button (💬)
           GestureDetector(

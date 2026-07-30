@@ -74,7 +74,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.kiraclubs.app</string>
+			<string>com.kiraclubs.live</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>kiraclubs</string>

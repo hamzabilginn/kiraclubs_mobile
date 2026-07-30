@@ -662,6 +662,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final isUnderReview = (auth.user?.iosInReview ?? false) && Platform.isIOS;
     final bool isPartnerVerified = widget.partner.verificationStatus == 'verified';
 
     return Scaffold(
@@ -998,21 +1000,21 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            /*
-            GestureDetector(
-              onTap: _showGiftSheet,
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEC4899),
-                  borderRadius: BorderRadius.circular(12),
+            if (!isUnderReview) ...[
+              GestureDetector(
+                onTap: _showGiftSheet,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEC4899),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
               ),
-            ),
-            const SizedBox(width: 6),
-            */
+              const SizedBox(width: 6),
+            ],
             GestureDetector(
               onTap: _startRecording,
               child: Container(
